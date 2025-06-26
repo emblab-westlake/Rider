@@ -4,7 +4,6 @@ Script Name: predict_pipline.py
 Version: 1.0.0
 Author: Gaoyang Luo
 Contact information: lgyjsnjhit@gmail.com
-                     luogaoyang@westlake.edu.cn
 Created Date: 2024-11-20
 Last Modified Date: 2024-11-23
 Description: 
