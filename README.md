@@ -1,9 +1,13 @@
 # 🧬 Rider
 
 **Rider** enables fast identification of known and novel RNA viruses from large volumes of metatranscriptomic sequencing data.  
-It integrates sequence classification, structure prediction, and structure alignment into a streamlined pipeline.
+It integrates sequence classification, structure predictcion, and structure alignment into a streamlined pipeline.
 
----
+
+## 🏗️ Architecture
+
+![Rider Workflow](docs/architecture/Rider_workflow_3.png)
+*Figure 1: Rider pipeline workflow showing the complete data processing flow from input sequences to final virus identification.*
 
 ## 🚀 Installation
 You can use `git clone` and `conda` to set up the environment:
@@ -38,7 +42,7 @@ Rider depends on the following:
 
 All Python dependencies are included in environment.yaml.
 
-## 📁  Step 2. Download and prepare the Foldseek RDRP structure database
+## 📁  Step 2. Download and prepare the Rider RDRP structure database
 
 This database is required for structural alignment using Foldseek (step 6/7).
 
