@@ -290,8 +290,8 @@ def main():
     predicted_rdrp_fasta_path = os.path.join(tmp_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.faa")
     
     # Model paths
-    esmfold_dir = os.path.join(script_dir, "esmfold_v1")
-    esmt12_dir = os.path.join(script_dir, "esm2_t12_35M_UR50D")
+    esmfold_dir=os.path.join(script_dir,"submodule", "esmfold_v1")
+    esmt12_dir=os.path.join(script_dir,"submodule", "esm2_t12_35M_UR50D")
     known_rdrp = os.path.join(script_dir, "data", "NCBI_RNA_virus_refseq.fasta")
 
     # Output file paths
