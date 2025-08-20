@@ -98,3 +98,55 @@ do
 done
 
 ```
+
+## 🔗 Merge Foldseek top-hits with taxonomy
+
+A helper script is provided to merge Foldseek m8 results (one-line-per-alignment format)
+with a taxonomy table. The script selects the top hit per query according to the `tm_score`
+and attaches taxonomy fields (matched by accession, with optional version suffix removed).
+
+Script path: `Rider/utils/rider_merge_taxonomy.py`
+
+Usage:
+```bash
+python /root/gaoyang/westlake_emblab/Rider/utils/rider_merge_taxonomy.py \
+    --m8_file /path/to/foldseek_results.m8 \
+    --taxo_file /path/to/taxonomy.tsv \
+    --output_file /path/to/output_top_hit_taxonomy.tsv
+```
+
+Arguments:
+
+- --m8_file : Path to the Foldseek .m8 file (tab-separated, columns: query, target, identity, aln_len, matches, mismatches, q_start, q_end, t_start, t_end, evalue, tm_score). Default in script:
+/usr/commondata/public/gaoyang/foldseek_search_dir/rider_gt200_all_mapping_aln.m8
+- --taxo_file : Path to a taxonomy TSV file that must contain an Accession column. Default in script:
+/home/gaoyang/Rider/utils/taxo_Rider_train_dat_parsed_taxonomy.tsv
+- --output_file : Path to write the merged output (TSV). Default in script:
+/usr/commondata/public/gaoyang/foldseek_search_dir/foldseek_top_hit_taxonomy_lucaprot_gt200_all_mapping_aln.tsv
+
+What the script does:
+
+1. Reads the m8 file and converts the tm_score column to numeric.
+2. Picks the top hit per query by descending tm_score.
+3. Removes version suffix from target (e.g. .1) before matching to accession.
+4. Reads the taxonomy file, expects an Accession column, and deduplicates by Accession.
+5. Left-joins the top hits with taxonomy fields using cleaned target -> Accession.
+6. Outputs a TSV with columns: query, target, plus all taxonomy columns except Accession.
+
+Notes and tips:
+
+- The script will exit with an error if either input file is missing or if the taxonomy file lacks an Accession column.
+- If your m8 file or taxonomy file is large, ensure sufficient memory is available. Consider pre-filtering if necessary.
+- The script strips a trailing dot followed by digits from the target accession (regex: \.\d+$). Modify the regex in the script if your accession format differs.
+- To make the script executable and run it directly:
+```bash
+chmod +x /Rider/utils/rider_merge_taxonomy.py
+/root/gaoyang/westlake_emblab/Rider/utils/rider_merge_taxonomy.py --m8_file ... --taxo_file ... --output_file ...
+```
+Example:
+```bash
+python Rider/utils/rider_merge_taxonomy.py \
+--m8_file /usr/commondata/public/gaoyang/foldseek_search_dir/rider_gt200_all_mapping_aln.m8 \
+--taxo_file Rider/utils/taxo_Rider_train_dat_parsed_taxonomy.tsv \
+--output_file /foldseek_search_dir/foldseek_top_hit_taxonomy_lucaprot_gt200_all_mapping_aln.tsv
+```
