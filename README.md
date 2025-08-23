@@ -142,29 +142,39 @@ Number of top hits to average when computing homology probability. Higher values
 
 ### Light mode: predict_pipline (no structure prediction)
 
-Use this mode when you only need sequence-level classification and want a fast, low‑resource run.  
-This script (function `main_light` in `predict_pipline.py`) runs steps 1–3 only:
+Location: `predict_pipline_light.py`
 
+Purpose
+- A standalone, lightweight pipeline that performs only sequence-level classification (no structure prediction, clustering, or Foldseek alignment).  
+- Use this script for fast screening or when Foldseek/mmseqs2/ESMFold are unavailable.
+
+What it does
 - Step 1: Load & tokenize input FASTA (pads with sequences from `--negative_sample_path` if needed)  
 - Step 2: Extract feature embeddings (ESM-based)  
 - Step 3: Classify embeddings and save predicted results
 
-Key points
-- No structure prediction (ESMFold), no clustering (mmseqs2), and no Foldseek alignment — much faster and uses less GPU/RAM.  
-- Accepts the same CLI arguments, but structure-related flags are ignored in this mode.  
-- If input count < batch size, the script pads the batch with sequences from `--negative_sample_path` and tracks padded indices.
+CLI (same style as `predict_pipline.py`)
+- `-i`, `--input_faa` (required) — input FASTA file (one protein per record)  
+- `-w`, `--weights` (required) — classifier weights (safetensors)  
+- `-b`, `--batch_sizes` (default: 64) — batch size for feature extraction  
+- `--sequence_length` (default: 1024) — tokenizer max length  
+- `--device` (default: "cuda") — compute device  
+- `--negative_sample_path` — path to negative sample FASTA for padding  
+- `-o`, `--output_dir` — output directory  
+- Structure-related flags may be accepted but are not used by this script
 
-Outputs (saved to `<output_dir>/<input_basename>/<input_basename>_intermediate/`)
+Outputs (in `<output_dir>/<input_basename>/<input_basename>_intermediate/`)
 - `<file>_Rider_predicted_results.txt` — predictions (id, sequence, label 1/0)  
 - `<file>_Rider_predicted_RNA_Virus_potential_candidates.faa` — positive candidates  
 - `<file>_Rider_predicted_nonRNA.faa` — negative sequences  
-- `tmp_tensors/<file>_features_embeddings.pt` — cached embeddings  
-- `<file>_runtime_metrics.json` — runtime and memory metrics (step times, RSS, GPU mem)  
-- `rider_pipeline.log` — detailed logs
+- `tmp_tensors/<file>_features_embeddings.pt` — saved embeddings  
+- `<file>_runtime_metrics.json` — runtime & memory metrics (step times, RSS, GPU mem)  
+- `rider_pipeline.log` — run log
+
 
 Quick example
 ```bash
-python predict_pipline.py \
+python predict_pipline_light.py \
   -i /path/to/input.faa \
   -w /path/to/classifier_weights.safetensors \
   -b 32 \
