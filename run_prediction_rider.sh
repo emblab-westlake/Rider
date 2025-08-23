@@ -5,10 +5,11 @@ SCRIPT_PATH=$(dirname ${SCRIPT})
 
 cd $SCRIPT_PATH
 
-source /root/miniconda3/bin/activate LRVM_gy
-INPUT_DIR=/home/gaoyang/dataset/yuanlin/find_new_vir/complete_proteins  #yuanlin_sewage
-output_path=/usr/commondata/public/gaoyang/software/rider/RNA_virus_project/yuanlinAS #yuanlin_AS
-weights=$SCRIPT_PATH/checkpoint/checkpoint102000/model.safetensors
+# source /opt/miniforge3/bin/activate rider
+INPUT_DIR=/root/gaoyang/westlake_emblab/Rider/test_data  #test_data
+output_path=/root/gaoyang/westlake_emblab/Rider/test_data/test_results #results
+weights=$SCRIPT_PATH/checkpoint/checkpoint-102000/model.safetensors
+Rider_pdb_database=/usr/commondata/public/gaoyang/Rider_pdb_database/database
 
 # Print for debugging
 echo "Using weights from: $weights"
@@ -25,12 +26,12 @@ CUDA_VISIBLE_DEVICES=6 \
     python predict_pipline.py \
         -i ${i} \
         -w ${weights} \
-        -b 256 \
+        -b 64 \
         -o ${output_path} \
         --predict_structure \
         --sequence_length 1024 \
         --structure_align_enabled \
-        --rdrp_structure_database "/usr/commondata/public/gaoyang/Rider_pdb_database/database" \
+        --rdrp_structure_database ${Rider_pdb_database} \
         --prob_threshold 50 \
         --top_n_mean_prob 1 \
         --alignment-type 1

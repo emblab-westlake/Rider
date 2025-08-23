@@ -186,6 +186,7 @@ u_find_new_virus1
 esm2_t12_35M_UR50D.tar.gz
 jupyters
 #submodules
+submodule
 submodule/foldseek
 models_experiment
 benchmark_experiments
@@ -205,3 +206,6 @@ run_prediction_rider_luca*
 #fasta
 plot_draw
 tmp_tensors
+
+#testdata
+test_results

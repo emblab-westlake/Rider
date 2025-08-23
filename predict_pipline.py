@@ -50,13 +50,15 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 default_negative_sample_path = os.path.join(script_dir, "databases", "false256.faa")
 # Set default path for the Foldseek RDRP structure database
 default_rdrp_db_path = os.path.join(script_dir, "Rider_pdb_database", "database")
+# Set default path for weight
+default_weight_path=os.path.join(script_dir, "checkpoint", "checkpoint-102000","model.safetensors") #Rider/checkpoint/checkpoint-102000/model.safetensors
 
 # parse arg
 def parse_args():
     parser = argparse.ArgumentParser(description="Protein sequence classification and structure prediction pipeline.")
     parser.add_argument("-i", "--input_faa", required=True, type=str, 
                         help="Path to the input FASTA file.")
-    parser.add_argument("-w", "--weights", required=True, type=str, 
+    parser.add_argument("-w", "--weights", required=True, type=str, default=default_weight_path,
                         help="Path to the model weights.")
     parser.add_argument("-b", "--batch_sizes", type=int, default=64, 
                         help="Batch size for processing.")
@@ -292,7 +294,7 @@ def main():
     # Model paths
     esmfold_dir=os.path.join(script_dir,"submodule", "esmfold_v1")
     esmt12_dir=os.path.join(script_dir,"submodule", "esm2_t12_35M_UR50D")
-    known_rdrp = os.path.join(script_dir, "data", "NCBI_RNA_virus_refseq.fasta")
+    known_rdrp = os.path.join(script_dir, "databases", "NCBI_RNA_virus_refseq.fasta")
 
     # Output file paths
     results_file = os.path.join(tmp_dir, f"{file_name}_Rider_predicted_results.txt")

@@ -109,7 +109,7 @@ def process_fixed_prob_out_folders(input_root_dir, alignment_type=1, n=1, prob_t
                             print(f"Processing file: {m8_file_path}")
                             
                             # Save results in the same subdirectory
-                            process_m8_file(m8_file_path, subdir_path, n=n, prob_threshold=prob_threshold)
+                            process_m8_file(m8_file_path, subdir_path, prob_threshold=prob_threshold)
                 else:
                     print(f"Skipped: prob_out folder does not exist: {prob_out_dir}")
             else:

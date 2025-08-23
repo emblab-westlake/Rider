@@ -285,7 +285,7 @@ def main_light():
     # Model and resource paths
     esmfold_dir=os.path.join(script_dir,"submodule", "esmfold_v1")
     esmt12_dir=os.path.join(script_dir,"submodule", "esm2_t12_35M_UR50D")
-    known_rdrp = os.path.join(script_dir, "data", "NCBI_RNA_virus_refseq.fasta")
+    known_rdrp = os.path.join(script_dir, "databases", "NCBI_RNA_virus_refseq.fasta")
 
     # Output file paths
     results_file = os.path.join(tmp_dir, f"{file_name}_Rider_predicted_results.txt")
