@@ -18,39 +18,34 @@ git clone https://github.com/emblab-westlake/Rider.git
 cd Rider
 
 # Create conda environment
-conda env create -f environment.yaml
-
-# Unpack Foldseek
-cd submodule
-tar xvzf foldseek-linux-avx2.tar.gz
-
-# Unpack ESM2 model (if compressed)
-cd ..
-gunzip esm2_t12_35M_UR50D.gz
+conda env create -f env.yaml
+conda activate rider
+pip install -r requirements.txt
 ```
-✅ Make sure the following two folders exist under the Rider root:
 
-- `esm2_t12_35M_UR50D/`
-- `esmfold_v1/`
 
-## 📦 Dependency
+## 📁  Step 2. Download and prepare the Rider Dependency
+### 📦 Dependency
 Rider depends on the following:
 
 - ESM2 (sequence embeddings)
 - ESMFold (structure prediction)
 - Foldseek (structure alignment)
-
-All Python dependencies are included in environment.yaml.
-
-## 📁  Step 2. Download and prepare the Rider RDRP structure database
+- Rider structure database (RNA viral protein strucutre reference)
 
 This database is required for structural alignment using Foldseek (step 6/7).
 
 📥 How to prepare:
-1. Download the Foldseek-format database manually (link to be provided).
+1. Download the prebuilt dependencies and database manually (Zenodo: https://doi.org/10.5281/zenodo.15742756) or follow your internal distribution process.
 2. Place it under the Rider folder like this:
+
+✅ Required layout:
 ```sh
 Rider/
+└── Submodule/
+    └── esmfold_v1/    # esmfold
+    └── esm2_t12_35M_UR50D # ESM_35M
+    └── foldseek #foldseek binaries (e.g., foldseek-linux-*)
 └── Rider_pdb_database/
     └── database/    # <- Foldseek database files go here
 ```
@@ -59,44 +54,122 @@ Alternatively, pass a custom path using:
 ```sh
 --rdrp_structure_database /your/custom/path/database
 ```
+Note: Foldseek and mmseqs2 are external binaries. Rider attempts to add submodule/foldseek/bin to PATH, but mmseqs2 usually needs separate installation (e.g., conda: `conda install -c bioconda mmseqs2`). Verify with `which mmseqs` and `mmseqs --version`.
 
-
-## 🧪 Easy Example
+## 🧪 Quick run example
 You can run the pipeline using the provided shell script `run_prediction_rider.sh`:
 
 ```sh
 # Activate the conda environment
-source /root/miniconda3/bin/activate LRVM_gy
-
-# Set input and output paths
-INPUT_DIR=/home/gaoyang/dataset/yuanlin/find_new_vir/complete_proteins
-OUTPUT_DIR=/usr/commondata/public/gaoyang/software/rider/RNA_virus_project/yuanlinAS
+# source /root/miniconda3/bin/activate rider
 SCRIPT_PATH=$(dirname $(readlink -f "$0"))
+# Set input and output paths
+INPUT_DIR=$SCRIPT_PATH/test_data  #test_data
+OUTPUT_DIR=$SCRIPT_PATH/test_data/test_results
 WEIGHTS=$SCRIPT_PATH/checkpoint/checkpoint102000/model.safetensors
-```sh
 
-```sh
-for i in $INPUT_DIR/*faa
+for i in $INPUT_DIR/*
 do
     base=$(basename ${i})
     out_dir=${OUTPUT_DIR}/${base}
     mkdir -p ${out_dir}
 
     CUDA_VISIBLE_DEVICES=6 \
-    python predict_pipline.py \
+    python $SCRIPT_PATH/predict_pipline.py \
         -i ${i} \
         -w ${WEIGHTS} \
-        -b 256 \
+        -b 64 \ #batch size, according to your GPU memory, suggest using no more than 64 if memory less than 16G
         -o ${OUTPUT_DIR} \
-        --predict_structure \
+        --predict_structure \ #if not want to using structure validation, please use predict_pipline_light.py
         --sequence_length 1024 \
         --structure_align_enabled \
         --rdrp_structure_database "$SCRIPT_PATH/Rider_pdb_database/database" \
-        --prob_threshold 50 \
+        --prob_threshold 60 \
         --top_n_mean_prob 1 \
         --alignment-type 1
 done
+```
+Arguments explained
 
+- `-i`, `--input_faa` (str, required)
+Path to input FASTA file. Each record should be one protein sequence.
+
+- `-w`, `--weights` (str, required)
+Path to the classification model weights (safetensors). Default in code: checkpoint/checkpoint-102000/model.safetensors.
+
+- `-b`, `--batch_sizes` (int, default=64)
+Batch size for tokenization / feature extraction. Adjust based on GPU memory (≤ 64 suggested for <16GB GPU).
+
+- `-t`, `--threads` (int, default=16)
+Number of CPU threads.
+
+- `-o`, `--output_dir` (str, default=./)
+Output root directory. The pipeline creates a per-input subdirectory with intermediate and final results.
+
+- `--sequence_length` (int, default=1024)
+Tokenizer maximum length. Increase only if necessary and if model supports it.
+
+- `--predict_structure` (flag)
+Enable structure prediction (ESMFold). If not set, structure prediction steps are skipped.
+
+- `--structure_model_path` (str)
+Path to a custom structure model. If not provided, submodule/esmfold_v1 is used.
+
+- `--threshold` (float, default=0.8)
+Classification score threshold to call positive.
+
+- `--device` (str, default="cuda")
+Computation device (e.g., "cuda", "cuda:0", "cpu").
+
+- `--negative_sample_path` (str)
+Path to negative sample FASTA used to pad batches. Default: databases/false256.faa.
+
+- `--structure_align_enabled` (flag)
+Enable Foldseek structural alignment (requires Foldseek binary and Rider PDB database).
+
+- `--rdrp_structure_database` (str)
+Path to Foldseek database directory. Required if --structure_align_enabled is set.
+
+- `--alignment-typ`e (int, default=1)
+Foldseek alignment type parameter (passed to the alignment runner).
+
+`--prob_threshold` (int, default=50)
+Homology probability threshold (percentage) used to filter Foldseek results.
+
+- `--top_n_mean_prob` (int, default=1)
+Number of top hits to average when computing homology probability. Higher values make validation stricter.
+
+
+### Light mode: predict_pipline (no structure prediction)
+
+Use this mode when you only need sequence-level classification and want a fast, low‑resource run.  
+This script (function `main_light` in `predict_pipline.py`) runs steps 1–3 only:
+
+- Step 1: Load & tokenize input FASTA (pads with sequences from `--negative_sample_path` if needed)  
+- Step 2: Extract feature embeddings (ESM-based)  
+- Step 3: Classify embeddings and save predicted results
+
+Key points
+- No structure prediction (ESMFold), no clustering (mmseqs2), and no Foldseek alignment — much faster and uses less GPU/RAM.  
+- Accepts the same CLI arguments, but structure-related flags are ignored in this mode.  
+- If input count < batch size, the script pads the batch with sequences from `--negative_sample_path` and tracks padded indices.
+
+Outputs (saved to `<output_dir>/<input_basename>/<input_basename>_intermediate/`)
+- `<file>_Rider_predicted_results.txt` — predictions (id, sequence, label 1/0)  
+- `<file>_Rider_predicted_RNA_Virus_potential_candidates.faa` — positive candidates  
+- `<file>_Rider_predicted_nonRNA.faa` — negative sequences  
+- `tmp_tensors/<file>_features_embeddings.pt` — cached embeddings  
+- `<file>_runtime_metrics.json` — runtime and memory metrics (step times, RSS, GPU mem)  
+- `rider_pipeline.log` — detailed logs
+
+Quick example
+```bash
+python predict_pipline.py \
+  -i /path/to/input.faa \
+  -w /path/to/classifier_weights.safetensors \
+  -b 32 \
+  --sequence_length 1024 \
+  -o /path/to/output_dir
 ```
 
 ## 🔗 Merge Foldseek top-hits with taxonomy
@@ -117,12 +190,9 @@ python /root/gaoyang/westlake_emblab/Rider/utils/rider_merge_taxonomy.py \
 
 Arguments:
 
-- --m8_file : Path to the Foldseek .m8 file (tab-separated, columns: query, target, identity, aln_len, matches, mismatches, q_start, q_end, t_start, t_end, evalue, tm_score). Default in script:
-/usr/commondata/public/gaoyang/foldseek_search_dir/rider_gt200_all_mapping_aln.m8
-- --taxo_file : Path to a taxonomy TSV file that must contain an Accession column. Default in script:
-/home/gaoyang/Rider/utils/taxo_Rider_train_dat_parsed_taxonomy.tsv
-- --output_file : Path to write the merged output (TSV). Default in script:
-/usr/commondata/public/gaoyang/foldseek_search_dir/foldseek_top_hit_taxonomy_lucaprot_gt200_all_mapping_aln.tsv
+- --m8_file : Path to the Foldseek .m8 file (tab-separated, columns: query, target, identity, aln_len, matches, mismatches, q_start, q_end, t_start, t_end, evalue, tm_score).
+- --taxo_file : Path to a taxonomy TSV file that must contain an Accession column.
+- --output_file : Path to write the merged output (TSV).
 
 What the script does:
 
