@@ -166,10 +166,9 @@ esm2_t30_150M_UR50D/
 esm2_t33_650M_UR50D/
 prot_t5_xl_half_uniref50_encoderOnly/
 esmfold_v1/
-*model.safetensors*
+
 
 #wandb,logging,checking
-checkpoint
 logging
 wandb
 *done*

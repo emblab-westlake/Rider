@@ -25,6 +25,7 @@ mkdir -p ${out_dir}
 CUDA_VISIBLE_DEVICES=6 \
     python predict_pipline.py \
         -i ${i} \
+        -t 32 \
         -w ${weights} \
         -b 64 \
         -o ${output_path} \

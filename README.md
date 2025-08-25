@@ -146,6 +146,7 @@ do
     CUDA_VISIBLE_DEVICES=6 \
     python $SCRIPT_PATH/predict_pipline.py \
         -i ${i} \
+        -t 128 \
         -w ${WEIGHTS} \
         -b 64 \ #batch size, according to your GPU memory, suggest using no more than 64 if memory less than 16G
         -o ${OUTPUT_DIR} \

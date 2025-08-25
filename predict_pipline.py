@@ -58,6 +58,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Protein sequence classification and structure prediction pipeline.")
     parser.add_argument("-i", "--input_faa", required=True, type=str, 
                         help="Path to the input FASTA file.")
+    parser.add_argument("-t", "--threads", type=int, default=16, 
+                    help="Number of CPU threads to use.")
     parser.add_argument("-w", "--weights", required=True, type=str, default=default_weight_path,
                         help="Path to the model weights.")
     parser.add_argument("-b", "--batch_sizes", type=int, default=64, 
@@ -458,7 +460,8 @@ def main():
             input_dir=args.output_dir,
             database_dir=args.rdrp_structure_database,
             alignment_type=args.alignment_type,
-            sequence_length=args.sequence_length
+            sequence_length=args.sequence_length,
+            threads=args.threads
         )
         foldseek_runner.foldseek_batch()
         logging.info("Foldseek alignment completed.")
