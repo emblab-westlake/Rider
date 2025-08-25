@@ -209,3 +209,5 @@ tmp_tensors
 
 #testdata
 test_results
+test_data
+run_prediction_rider_cronay.sh

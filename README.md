@@ -10,6 +10,12 @@ It integrates sequence classification, structure predictcion, and structure alig
 *Figure 1: Rider pipeline workflow showing the complete data processing flow from input sequences to final virus identification.*
 
 ## 🚀 Installation
+Two supported ways to prepare the Rider environment:
+
+A. Developer / reproducible setup (recommended for development)
+
+This keeps your original env.yaml-based workflow. It recreates the exact conda environment used during development and installs Python packages from requirements.txt.
+
 You can use `git clone` and `conda` to set up the environment:
 
 ```bash
@@ -20,9 +26,72 @@ cd Rider
 # Create conda environment
 conda env create -f env.yaml
 conda activate rider
-pip install -r requirements.txt
-```
 
+# Install Python-only dependencies (pip)
+pip install -r requirements.txt
+
+# Install Rider package in editable mode for development
+pip install -e .
+```
+Notes:
+
+- `env.yaml` installs system/bio tools (mmseqs2, diamond, blast, hmmer, prodigal, entrez-direct) from conda-forge / bioconda so they are available on PATH.
+- `requirements.txt` lists many heavy GPU and system packages (torch, triton, deepspeed). Installing them via pip in some systems may fail or produce suboptimal GPU behavior — see the alternative installation below for a safer approach.
+
+B. Recommended user installation (safer for end users; preferred for running pipelines)
+
+Use conda to install PyTorch (choose CPU or GPU build) and binary tools, then install the Rider package with pip. This avoids pip attempting to build or incorrectly install GPU binaries.
+CPU-only example:
+```bash
+conda create -n rider python=3.10 -y
+conda activate rider
+
+# Install PyTorch (CPU-only) via official PyTorch channel
+conda install -c pytorch pytorch cpuonly -y
+
+# Install bioinformatics binaries via bioconda/conda-forge
+conda install -c conda-forge -c bioconda mmseqs2 foldseek diamond blast hmmer prodigal entrez-direct -y
+
+# Install other Python dependencies (pip) and Rider (editable)
+pip install -r requirements.txt --no-deps
+pip install -e .
+```
+GPU example (adjust cudatoolkit to your GPU/cuda compatibility):
+```bash
+conda create -n rider-gpu python=3.10 -y
+conda activate rider-gpu
+
+# Install PyTorch with CUDA support (example uses cudatoolkit=11.8)
+conda install -c pytorch pytorch torchvision torchaudio cudatoolkit=11.8 -y
+
+# Install bioinformatics binaries
+conda install -c conda-forge -c bioconda mmseqs2 foldseek diamond blast hmmer prodigal entrez-direct -y
+
+# Install other Python deps without re-installing torch/triton/deepspeed (use --no-deps)
+pip install -r requirements.txt --no-deps
+pip install -e .
+```
+Key points:
+
+- We recommend installing torch/triton/deepspeed via conda (or follow official wheel instructions) rather than letting pip pick a binary. This prevents GPU/CUDA mismatches.
+- Use pip install -r requirements.txt --no-deps to avoid pip changing the conda-installed packages. Alternatively, selectively pip install the non-binary Python packages (listed below).
+
+Minimal pip-installed Python packages (examples — already included in setup.py):
+
+- absl-py, accelerate, aiohttp, datasets, einops, fair-esm, fsspec, gitpython, h5py, huggingface-hub, matplotlib, numpy, pandas, pytorch-lightning, pyyaml, scikit-learn, scipy, tokenizers, transformers, umap-learn, wandb, biopython, safetensors, psutil
+
+C. Quick verification
+After installation, ensure binaries are available:
+```bash
+which mmseqs
+which foldseek
+mmseqs --version
+foldseek version   # or foldseek --help
+```
+Then test Rider CLI (after pip install -e .):
+```bash
+rider-predict -h
+```
 
 ## 📁  Step 2. Download and prepare the Rider Dependency
 ### 📦 Dependency
