@@ -115,7 +115,8 @@ Rider/
     └── esmfold_v1/    # esmfold
     └── esm2_t12_35M_UR50D # ESM_35M
     └── foldseek #foldseek binaries (e.g., foldseek-linux-*)
-└── database    # <- Foldseek database files go here
+└── Rider_pdb_database/
+    └── database/    # <- Foldseek database files go here
 ```
 
 Alternatively, pass a custom path using:
