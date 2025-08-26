@@ -6,7 +6,7 @@ It integrates sequence classification, structure predictcion, and structure alig
 
 ## 🏗️ Architecture
 
-![Rider Workflow](docs/architecture/Rider_workflow_3.png)
+![Rider Workflow](docs/architecture/Rider_workflow.png)
 *Figure 1: Rider pipeline workflow showing the complete data processing flow from input sequences to final virus identification.*
 
 ## 🚀 Installation
