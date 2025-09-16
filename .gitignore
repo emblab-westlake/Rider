@@ -198,7 +198,9 @@ dataGenerator
 
 #shell script
 run_prediction_rider_luca*
-
+run_prediction_rider_ICTV.sh
+run_prediction_rider_*
+common_id_luca.py
 #figure
 # plot_draw
 
@@ -209,4 +211,18 @@ tmp_tensors
 #testdata
 test_results
 test_data
-run_prediction_rider_cronay.sh
+
+#checkpoint
+delete
+tmp/
+
+#doc or data
+NCBI_all_length_rdrp_contained.faa
+ICTV_RNA_Virus_7346_rdrp_contained.faa
+old_plus_ncib_refseq_train_data_cdhit95.faa.clstr
+old_plus_ncib_refseq_train_data.faa
+common_ids_ICTV_Lucaprot.txt
+
+#py
+predict_pipline_light.py
+

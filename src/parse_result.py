@@ -86,16 +86,21 @@ def extract_sequences_from_faa(faa_file, final_result_file, output_file):
             out_f.write("")  # Create an empty file
 
 
-def process_final_result(output_dir):
+def process_final_result(output_dir, sample_name=None):
     """
     Traverse subdirectories under output_dir, process final_result.txt files,
     extract corresponding sequences from .faa files, and save them as final_candidate.txt.
 
     :param output_dir: Path to the output directory
+    :param sample_name: Name of the specific sample to process (optional)
     """
     for subdir in os.listdir(output_dir):
+        # Skip directories that do not match the sample_name (if provided)
+        if sample_name and subdir != sample_name:
+            continue
+
         subdir_path = os.path.join(output_dir, subdir)
-        
+
         # Ensure it's a directory
         if os.path.isdir(subdir_path):
             # Construct the _intermediate folder path
@@ -104,7 +109,7 @@ def process_final_result(output_dir):
             print(f"Parsing faa file path: {faa_file}")
             final_result_file = os.path.join(subdir_path, "final_result.txt")
             output_file = os.path.join(subdir_path, "final_candidate.txt")
-            
+
             # Check existence of .faa file and final_result.txt
             if not os.path.exists(faa_file):
                 print(f"Error: .faa file not found: {faa_file}")
