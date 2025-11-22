@@ -3,6 +3,8 @@
 **Rider** enables fast identification of known and novel RNA viruses from large volumes of metatranscriptomic sequencing data.  
 It integrates sequence classification, structure predictcion, and structure alignment into a streamlined pipeline.
 
+We are keeping updating this project...
+
 
 ## 🏗️ Architecture
 
@@ -12,7 +14,7 @@ It integrates sequence classification, structure predictcion, and structure alig
 ## 🚀 Installation
 Two supported ways to prepare the Rider environment:
 
-A. Developer / reproducible setup (recommended for development)
+**A. Developer / reproducible setup (recommended for development)**
 
 This keeps your original env.yaml-based workflow. It recreates the exact conda environment used during development and installs Python packages from requirements.txt.
 
@@ -38,7 +40,7 @@ Notes:
 - `env.yaml` installs system/bio tools (mmseqs2, diamond, blast, hmmer, prodigal, entrez-direct) from conda-forge / bioconda so they are available on PATH.
 - `requirements.txt` lists many heavy GPU and system packages (torch, triton, deepspeed). Installing them via pip in some systems may fail or produce suboptimal GPU behavior — see the alternative installation below for a safer approach.
 
-B. Recommended user installation (safer for end users; preferred for running pipelines)
+**B. Manual Conda Setup (GPU/CPU control; safer for end users; preferred for running pipelines)**
 
 Use conda to install PyTorch (choose CPU or GPU build) and binary tools, then install the Rider package with pip. This avoids pip attempting to build or incorrectly install GPU binaries.
 CPU-only example:
@@ -71,6 +73,12 @@ conda install -c conda-forge -c bioconda mmseqs2 foldseek diamond blast hmmer pr
 pip install -r requirements.txt --no-deps
 pip install -e .
 ```
+**C. Install from Conda (One-Step, comming soon...)**
+<!-- conda create -n rider python=3.10 -y
+conda activate rider
+conda install -c YOUR_USERNAME rider -->
+
+
 Key points:
 
 - We recommend installing torch/triton/deepspeed via conda (or follow official wheel instructions) rather than letting pip pick a binary. This prevents GPU/CUDA mismatches.
@@ -80,13 +88,12 @@ Minimal pip-installed Python packages (examples — already included in setup.py
 
 - absl-py, accelerate, aiohttp, datasets, einops, fair-esm, fsspec, gitpython, h5py, huggingface-hub, matplotlib, numpy, pandas, pytorch-lightning, pyyaml, scikit-learn, scipy, tokenizers, transformers, umap-learn, wandb, biopython, safetensors, psutil
 
-C. Quick verification
+**Quick verification**
+
 After installation, ensure binaries are available:
 ```bash
 which mmseqs
-which foldseek
-mmseqs --version
-foldseek version   # or foldseek --help
+mmseqs -h
 ```
 Then test Rider CLI (after pip install -e .):
 ```bash
@@ -100,12 +107,12 @@ Rider depends on the following:
 - ESM2 (sequence embeddings)
 - ESMFold (structure prediction)
 - Foldseek (structure alignment)
-- Rider structure database (RNA viral protein strucutre reference)
+- Rider structure database (RNA viral protein strucutre reference) (comming soon...)
 
 This database is required for structural alignment using Foldseek (step 6/7).
 
 📥 How to prepare:
-1. Download the prebuilt dependencies and database manually (Zenodo: https://doi.org/10.5281/zenodo.15742756) or follow your internal distribution process.
+1. Download the prebuilt dependencies and database manually (Zenodo: https://doi.org/10.5281/zenodo.15742756) or follow your internal distribution process. We are preparing this...
 2. Place it under the Rider folder like this:
 
 ✅ Required layout:
@@ -113,7 +120,7 @@ This database is required for structural alignment using Foldseek (step 6/7).
 Rider/
 └── Submodule/
     └── esmfold_v1/    # esmfold
-    └── esm2_t12_35M_UR50D # ESM_35M
+    └── esm2_t12_35M_UR50D # ESM
     └── foldseek #foldseek binaries (e.g., foldseek-linux-*)
 └── Rider_pdb_database/
     └── database/    # <- Foldseek database files go here
@@ -126,37 +133,55 @@ Alternatively, pass a custom path using:
 Note: Foldseek and mmseqs2 are external binaries. Rider attempts to add submodule/foldseek/bin to PATH, but mmseqs2 usually needs separate installation (e.g., conda: `conda install -c bioconda mmseqs2`). Verify with `which mmseqs` and `mmseqs --version`.
 
 ## 🧪 Quick run example
-You can run the pipeline using the provided shell script `run_prediction_rider.sh`:
+You can run the pipeline using the provided shell script `Rider/run_rider_predict.sh`:
 
 ```sh
 # Activate the conda environment
 # source /root/miniconda3/bin/activate rider
 SCRIPT_PATH=$(dirname $(readlink -f "$0"))
 # Set input and output paths
-INPUT_DIR=$SCRIPT_PATH/test_data  #test_data
-OUTPUT_DIR=$SCRIPT_PATH/test_data/test_results
-WEIGHTS=$SCRIPT_PATH/checkpoint/checkpoint102000/model.safetensors
+# input, output paths and model weights
+INPUT_DIR="$SCRIPT_PATH/test_data"                          # input dir
+OUTPUT_PATH="$SCRIPT_PATH/test_data/test_results"           # output dir
+WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-44000/model.safetensors"
+RDRP_DB="/usr/commondata/public/gaoyang/Rider_pdb_database/Rider_pdb_database/database" #change this to your own path
+SUBMODULE_DIR="$SCRIPT_PATH/submodule"
 
-for i in $INPUT_DIR/*
-do
-    base=$(basename ${i})
-    out_dir=${OUTPUT_DIR}/${base}
-    mkdir -p ${out_dir}
+# Debug output
+echo "Using weights from: $WEIGHTS"
+echo "Input dir: $INPUT_DIR"
+echo "Output dir: $OUTPUT_PATH"
 
-    CUDA_VISIBLE_DEVICES=6 \
-    python $SCRIPT_PATH/predict_pipline.py \
-        -i ${i} \
-        -t 128 \
-        -w ${WEIGHTS} \
-        -b 64 \ #batch size, according to your GPU memory, suggest using no more than 64 if memory less than 16G
-        -o ${OUTPUT_DIR} \
-        --predict_structure \ #if not want to using structure validation, please use predict_pipline_light.py
+# loop through all .faa files in the input directory
+for i in "$INPUT_DIR"/*faa; do
+    base=$(basename "$i")
+    File_path=$(dirname "$i")
+    out_dir="${OUTPUT_PATH}/${base}"
+    mkdir -p "${out_dir}"
+
+    echo "Processing: $i"
+
+    # run rider-predict 
+    # Set CUDA_VISIBLE_DEVICES to specify which GPU to use
+    CUDA_VISIBLE_DEVICES=4 \
+    rider-predict \
+        -i "$i" \
+        -t 32 \
+        -w "$WEIGHTS" \
+        -b 64 \
+        --device cpu \ #or --device gpu
+        -o "$OUTPUT_PATH" \
+        --submodule_dir "$SUBMODULE_DIR" \
+        --predict_structure \
         --sequence_length 1024 \
         --structure_align_enabled \
-        --rdrp_structure_database "$SCRIPT_PATH/Rider_pdb_database/database" \
-        --prob_threshold 60 \
-        --top_n_mean_prob 1 \
+        --rdrp_structure_database "$RDRP_DB" \
+        --prob_threshold 50 \
+        --top_n_mean_prob 2 \
         --alignment-type 1
+
+    echo "Finished: $i"
+    echo "--------------------------------------------"
 done
 ```
 Arguments explained
@@ -203,56 +228,16 @@ Path to Foldseek database directory. Required if --structure_align_enabled is se
 - `--alignment-typ`e (int, default=1)
 Foldseek alignment type parameter (passed to the alignment runner).
 
-`--prob_threshold` (int, default=50)
+- `--prob_threshold` (int, default=50)
 Homology probability threshold (percentage) used to filter Foldseek results.
 
 - `--top_n_mean_prob` (int, default=1)
 Number of top hits to average when computing homology probability. Higher values make validation stricter.
 
-
-### Light mode: predict_pipline (no structure prediction)
-
-Location: `predict_pipline_light.py`
-
-Purpose
-- A standalone, lightweight pipeline that performs only sequence-level classification (no structure prediction, clustering, or Foldseek alignment).  
-- Use this script for fast screening or when Foldseek/mmseqs2/ESMFold are unavailable.
-
-What it does
-- Step 1: Load & tokenize input FASTA (pads with sequences from `--negative_sample_path` if needed)  
-- Step 2: Extract feature embeddings (ESM-based)  
-- Step 3: Classify embeddings and save predicted results
-
-CLI (same style as `predict_pipline.py`)
-- `-i`, `--input_faa` (required) — input FASTA file (one protein per record)  
-- `-w`, `--weights` (required) — classifier weights (safetensors)  
-- `-b`, `--batch_sizes` (default: 64) — batch size for feature extraction  
-- `--sequence_length` (default: 1024) — tokenizer max length  
-- `--device` (default: "cuda") — compute device  
-- `--negative_sample_path` — path to negative sample FASTA for padding  
-- `-o`, `--output_dir` — output directory  
-- Structure-related flags may be accepted but are not used by this script
-
-Outputs (in `<output_dir>/<input_basename>/<input_basename>_intermediate/`)
-- `<file>_Rider_predicted_results.txt` — predictions (id, sequence, label 1/0)  
-- `<file>_Rider_predicted_RNA_Virus_potential_candidates.faa` — positive candidates  
-- `<file>_Rider_predicted_nonRNA.faa` — negative sequences  
-- `tmp_tensors/<file>_features_embeddings.pt` — saved embeddings  
-- `<file>_runtime_metrics.json` — runtime & memory metrics (step times, RSS, GPU mem)  
-- `rider_pipeline.log` — run log
+## 🔗Cite us
 
 
-Quick example
-```bash
-python predict_pipline_light.py \
-  -i /path/to/input.faa \
-  -w /path/to/classifier_weights.safetensors \
-  -b 32 \
-  --sequence_length 1024 \
-  -o /path/to/output_dir
-```
-
-## 🔗 Merge Foldseek top-hits with taxonomy
+<!-- ## 🔗 Merge Foldseek top-hits with taxonomy
 
 A helper script is provided to merge Foldseek m8 results (one-line-per-alignment format)
 with a taxonomy table. The script selects the top hit per query according to the `tm_score`
@@ -299,4 +284,5 @@ python Rider/utils/rider_merge_taxonomy.py \
 --m8_file /usr/commondata/public/gaoyang/foldseek_search_dir/rider_gt200_all_mapping_aln.m8 \
 --taxo_file Rider/utils/taxo_Rider_train_dat_parsed_taxonomy.tsv \
 --output_file /foldseek_search_dir/foldseek_top_hit_taxonomy_lucaprot_gt200_all_mapping_aln.tsv
-```
+``` -->
+

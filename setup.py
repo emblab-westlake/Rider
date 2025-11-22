@@ -21,13 +21,12 @@ setup(
     long_description_content_type="text/markdown",
     author="Gaoyang Luo",
     author_email="lgyjsnjhit@gmail.com",
-    url="https://github.com/your-org/Rider",  # 修改为你的仓库 URL
+    url="https://github.com/emblab-westlake/Rider",  
     license="MIT",
     packages=find_packages(exclude=("tests", "docs")),
     include_package_data=True,
     python_requires=">=3.10",
     install_requires=[
-        # Core Python packages (selected from your requirements.txt)
         "absl-py>=2.1.0",
         "accelerate>=0.26.1",
         "aiohttp>=3.9.5",
@@ -54,18 +53,17 @@ setup(
         "psutil>=5.9.0",
     ],
     extras_require={
-        # Optional extras: developer / heavy-GPU dependencies can be documented here.
         "dev": ["pytest", "black", "flake8"],
     },
     entry_points={
         "console_scripts": [
-            # these two assume modules will be at rider/predict_pipline.py and rider/predict_pipline_light.py
-            "rider-predict = rider.predict_pipline:main",
-            "rider-predict-light = rider.predict_pipline_light:main",
+            "rider = rider.cli:main",
         ]
     },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
 )
