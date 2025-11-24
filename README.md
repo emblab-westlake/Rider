@@ -73,20 +73,6 @@ conda install -c conda-forge -c bioconda mmseqs2 foldseek diamond blast hmmer pr
 pip install -r requirements.txt --no-deps
 pip install -e .
 ```
-**C. Install from Conda (One-Step, comming soon...)**
-<!-- conda create -n rider python=3.10 -y
-conda activate rider
-conda install -c YOUR_USERNAME rider -->
-
-
-Key points:
-
-- We recommend installing torch/triton/deepspeed via conda (or follow official wheel instructions) rather than letting pip pick a binary. This prevents GPU/CUDA mismatches.
-- Use pip install -r requirements.txt --no-deps to avoid pip changing the conda-installed packages. Alternatively, selectively pip install the non-binary Python packages (listed below).
-
-Minimal pip-installed Python packages (examples — already included in setup.py):
-
-- absl-py, accelerate, aiohttp, datasets, einops, fair-esm, fsspec, gitpython, h5py, huggingface-hub, matplotlib, numpy, pandas, pytorch-lightning, pyyaml, scikit-learn, scipy, tokenizers, transformers, umap-learn, wandb, biopython, safetensors, psutil
 
 **Quick verification**
 
