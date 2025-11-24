@@ -105,11 +105,11 @@ This database is required for structural alignment using Foldseek (step 6/7).
 ```sh
 Rider/
 └── Submodule/
-    └── esmfold_v1/    # esmfold
-    └── esm2_t12_35M_UR50D # ESM
-    └── foldseek #foldseek binaries (e.g., foldseek-linux-*)
+    └── esmfold_v1/  
+    └── esm2_t12_35M_UR50D
+    └── foldseek 
 └── Rider_pdb_database/
-    └── database/    # <- Foldseek database files go here
+    └── database/ 
 ```
 
 Alternatively, pass a custom path using:
