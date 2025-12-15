@@ -221,7 +221,27 @@ Homology probability threshold (percentage) used to filter Foldseek results.
 Number of top hits to average when computing homology probability. Higher values make validation stricter.
 
 ## 🔗Cite us
+If you find this work useful in your research, please consider citing our paper:
 
+> **Expanding the RNA Virus Universe by Scalable Structure-Guided Discovery**
+> <br>
+> Gaoyang Luo, Zelin Zang, Ling Yuan, Jingbo Zhou, Ao Dong, Yufei Huang, Stan Z. Li, Feng Ju
+> <br>
+> *bioRxiv* 2025.11.24.690314; doi: [10.1101/2025.11.24.690314](https://doi.org/10.1101/2025.11.24.690314)
+
+**BibTeX:**
+
+```bibtex
+@article{Luo2025Expanding,
+  title = {Expanding the RNA Virus Universe by Scalable Structure-Guided Discovery},
+  author = {Luo, Gaoyang and Zang, Zelin and Yuan, Ling and Zhou, Jingbo and Dong, Ao and Huang, Yufei and Li, Stan Z. and Ju, Feng},
+  journal = {bioRxiv},
+  year = {2025},
+  doi = {10.1101/2025.11.24.690314},
+  url = {https://www.biorxiv.org/content/10.1101/2025.11.24.690314},
+  publisher = {Cold Spring Harbor Laboratory}
+}
+```
 
 <!-- ## 🔗 Merge Foldseek top-hits with taxonomy
 
