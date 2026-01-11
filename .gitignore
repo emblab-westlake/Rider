@@ -200,6 +200,7 @@ dataGenerator
 run_prediction_rider_luca*
 run_prediction_rider_ICTV.sh
 run_prediction_rider_*
+run_rider_predict_*
 common_id_luca.py
 #figure
 # plot_draw
@@ -225,4 +226,7 @@ common_ids_ICTV_Lucaprot.txt
 
 #py
 predict_pipline_light.py
+
+#dir
+revision_1
 
