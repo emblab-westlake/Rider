@@ -212,6 +212,7 @@ tmp_tensors
 #testdata
 test_results
 test_data
+time_test
 
 #checkpoint
 delete

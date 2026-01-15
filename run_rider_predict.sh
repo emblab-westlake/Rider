@@ -31,13 +31,13 @@ for i in "$INPUT_DIR"/*faa; do
 
     # run rider-predict 
     # Set CUDA_VISIBLE_DEVICES to specify which GPU to use
-    CUDA_VISIBLE_DEVICES=4 \
+    CUDA_VISIBLE_DEVICES=0 \
     rider-predict \
         -i "$i" \
         -t 32 \
         -w "$WEIGHTS" \
         -b 64 \
-        --device cpu \
+        --device cuda \ # change to cpu if you want to run on CPU
         -o "$OUTPUT_PATH" \
         --submodule_dir "$SUBMODULE_DIR" \
         --predict_structure \
