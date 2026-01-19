@@ -50,7 +50,7 @@ class Structure_aligned:
             output_file,                  # Output file path
             tmp_dir,                      # Temporary directory
             "--alignment-type", str(self.alignment_type),  # Alignment type parameter
-            "--format-output", "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,qtmscore"
+            "--format-output", "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,lddt,ttmscore,bits,qtmscore"
         ]
 
         logging.info(f"Running Foldseek command: {' '.join(foldseek_cmd)}")

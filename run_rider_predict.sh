@@ -37,7 +37,7 @@ for i in "$INPUT_DIR"/*faa; do
         -t 32 \
         -w "$WEIGHTS" \
         -b 64 \
-        --device cuda \ # change to cpu if you want to run on CPU
+        --device cuda \
         -o "$OUTPUT_PATH" \
         --submodule_dir "$SUBMODULE_DIR" \
         --predict_structure \

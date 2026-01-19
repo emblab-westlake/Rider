@@ -7,9 +7,12 @@ Contact information: lgyjsnjhit@gmail.com
                      luogaoyang@westlake.edu.cn
                      gaoyang.luo@unsw.edu.au
 Created Date: 2024-11-20
-Last Modified Date: 2024-11-23
+Last Modified Date: 2026-01-19
 Description: 
-    - filter homo prob
+    - Filter Foldseek results based on Bits score.
+    - Output includes structural metrics (LDDT, TM-score) and E-value.
+    - Requires Foldseek run with: 
+      --format-output query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,lddt,ttmscore,bits,qtmscore
 Notes:
     - Enjoy yourself!
 ------------------------------------------
@@ -27,8 +30,11 @@ def process_m8_file(m8_file_path, output_dir, prob_threshold=57):
     :param output_dir: Directory to save the output .txt file
     :param prob_threshold: Threshold to filter the probability (prob)
     """
-    col_names = ['query', 'target', 'qca', 'tca', 'alntmscore', 'qtmscore', 
-                 'ttmscore', 'u', 't', 'lddt', 'lddtfull', 'prob']
+    col_names = [
+        'query', 'target', 'fident', 'alnlen', 'mismatch', 'gapopen', 
+        'qstart', 'qend', 'tstart', 'tend', 
+        'evalue', 'lddt', 'ttmscore', 'bits', 'qtmscore'
+    ]
     
     # Read the .m8 file
     df = pd.read_csv(m8_file_path, sep='\t', names=col_names)
@@ -45,16 +51,20 @@ def process_m8_file(m8_file_path, output_dir, prob_threshold=57):
         if filtered_group.empty:
             continue
 
-        # Select the row with the highest `prob`
-        best_match = filtered_group.loc[filtered_group['prob'].idxmax()]
+        # Select the row with the highest `prob (bits)`
+        best_match = filtered_group.loc[filtered_group['bits'].idxmax()]
 
         # Retrieve the target and prob
         best_target = best_match['target']
-        best_prob = best_match['prob']
+        best_bits = best_match['bits']
+        best_qtm = best_match['qtmscore']
+        best_ttm = best_match['ttmscore']
+        best_lddt = best_match['lddt']
+        best_evalue = best_match['evalue']
 
         # Only keep queries with prob >= prob_threshold
-        if best_prob >= prob_threshold:
-            results.append((query, best_target, best_prob))
+        if best_bits >= prob_threshold:
+            results.append((query, best_target, best_bits, best_qtm, best_ttm, best_lddt, best_evalue))
 
     # Print the number of queries that meet the criteria
     print(f"Number of queries that meet the criteria: {len(results)}")
@@ -64,10 +74,10 @@ def process_m8_file(m8_file_path, output_dir, prob_threshold=57):
         output_file_path = os.path.join(output_dir, "final_result_taxonomy_id.txt")
 
         with open(output_file_path, 'w') as output_file:
-            for query, target, prob in results:
+            for query, target, bits, qtm, ttm, lddt, evalue  in results:
                 # Remove 'Rider_' prefix from query
                 cleaned_query = query.replace("Rider_", "")
-                output_file.write(f"{cleaned_query}\t{target}\t{prob:.2f}\n")
+                output_file.write(f"{cleaned_query}\t{target}\t{bits:.0f}\t{qtm:.4f}\t{ttm:.4f}\t{lddt:.2f}\t{evalue:.2e}\n")
 
         print(f"Results saved to {output_file_path}")
     else:
