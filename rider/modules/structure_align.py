@@ -49,7 +49,8 @@ class Structure_aligned:
             self.database_dir,            # Foldseek database directory
             output_file,                  # Output file path
             tmp_dir,                      # Temporary directory
-            "--alignment-type", str(self.alignment_type)  # Alignment type parameter
+            "--alignment-type", str(self.alignment_type),  # Alignment type parameter
+            "--format-output", "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,qtmscore"
         ]
 
         logging.info(f"Running Foldseek command: {' '.join(foldseek_cmd)}")
