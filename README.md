@@ -197,7 +197,7 @@ Enable structure prediction (ESMFold). If not set, structure prediction steps ar
 - `--structure_model_path` (str)
 Path to a custom structure model. If not provided, submodule/esmfold_v1 is used.
 
-- `--threshold` (float, default=0.8)
+- `--threshold` (float, default=0.5)
 Classification score threshold to call positive.
 
 - `--device` (str, default="cuda")
@@ -235,7 +235,7 @@ If you find this work useful in your research, please consider citing our paper:
 ```bibtex
 @article{Luo2025Expanding,
   title = {Expanding the RNA Virus Universe by Scalable Structure-Guided Discovery},
-  author = {Luo, Gaoyang and Zang, Zelin and Yuan, Ling and Zhou, Jingbo and Dong, Ao and Huang, Yufei and Li, Stan Z. and Ju, Feng},
+  author = {Luo Gaoyang, Zang Zelin, Yuan Ling, Zhou Jingbo, Dong Ao, Huang Yufei, Li Stan Z., Ju Feng},
   journal = {bioRxiv},
   year = {2025},
   doi = {10.1101/2025.11.24.690314},

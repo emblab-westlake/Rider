@@ -55,7 +55,7 @@ default_submodule_path = os.path.join(USER_DATA_DIR, "submodule")
 # Set default path for the Foldseek RDRP structure database
 default_rdrp_db_path = os.path.join(USER_DATA_DIR, "Rider_pdb_database", "database")
 # Set default path for weight
-default_weight_path=os.path.join(project_root, "checkpoint", "checkpoint-44000","model.safetensors") #Rider/checkpoint/checkpoint-102000/model.safetensors
+default_weight_path=os.path.join(project_root, "checkpoint", "checkpoint-4400","model.safetensors") #Rider/checkpoint/checkpoint-102000/model.safetensors
 
 # parse arg
 def parse_args():
@@ -76,8 +76,10 @@ def parse_args():
                         help="Enable structure prediction.")
     parser.add_argument("--structure_model_path", type=str, 
                         help="Path to the structure prediction model.")
-    parser.add_argument("--threshold", type=float, default=0.8, 
-                        help="Threshold value for classification (default: 0.8).")
+    parser.add_argument("--threshold", type=float, default=0.9, 
+                        help="Threshold value for classification (default: 0.95). \
+                            We suggest 0.99 as a conservative threshold to reduce false positives in real-world metagtranscriptomic data.\
+                            Lower thresholds (e.g., 0.9) may increase sensitivity but also false positives.")
     parser.add_argument("--device", type=str, default="cuda", 
                         help="Device to use for computation (default: 'cuda').")
     parser.add_argument("--negative_sample_path", type=str, default=default_negative_sample_path, 
@@ -171,6 +173,8 @@ class SimpleClassifier(nn.Module):
                 batch_first=True  # better performance and avoids nested tensor warning
             )
             self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+            # 【关键修改】：显式定义 self.batch_first = True
+            self.batch_first = True 
         except TypeError:
             # older PyTorch: batch_first not supported, fall back
             encoder_layer = nn.TransformerEncoderLayer(
@@ -180,6 +184,8 @@ class SimpleClassifier(nn.Module):
                 dropout=dropout
             )
             self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+            # 【关键修改】：显式定义 self.batch_first = False
+            self.batch_first = False
 
         self.linear = nn.Linear(input_dim, output_dim)
 
@@ -196,33 +202,55 @@ class SimpleClassifier(nn.Module):
 
     def forward(self, input_ids=None, labels=None):
         """
-        input_ids: either [batch, seq_len, input_dim] or [batch, input_dim]
-        returns ModelOutput with keys: logits, features, (loss if labels provided)
+        Forward pass of the model.
+        
+        Args:
+            input_ids: Tensor of shape [Batch, Seq, Dim] or [Batch, Dim].
+            labels: Tensor of shape [Batch].
         """
         x = input_ids
-        # If transformer_encoder was created with batch_first=True, it expects [batch, seq, dim]
-        # If input is [batch, input_dim], we treat it as seq_len=1 embedding per sample (no attention), so handle both.
-        if x.dim() == 2:
-            # treat as already the token-level representation (no sequence dim)
-            first_token_output = x
-        elif x.dim() == 3:
-            # standard: [batch, seq_len, dim]
-            first_token_output = x[:, 0, :]
-        else:
-            raise ValueError(f"Unexpected transformer output/input dimensions: {x.dim()}")
 
+        # 1. Normalize Input Dimensions
+        # If input is [Batch, Dim], treat it as a sequence of length 1: [Batch, 1, Dim]
+        if x.dim() == 2:
+            x = x.unsqueeze(1)
+        elif x.dim() != 3:
+            raise ValueError(f"Unexpected input dimensions: {x.dim()}. Expected 2 or 3.")
+
+        # 2. Transformer Encoder Pass
+        # 这里为了防止加载旧模型时 self.batch_first 丢失，使用 getattr 做双重保险
+        is_batch_first = getattr(self, 'batch_first', True)
+
+        if is_batch_first:
+            # Input is [Batch, Seq, Dim], pass directly
+            x = self.transformer_encoder(x)
+        else:
+            # Input needs to be [Seq, Batch, Dim] for older PyTorch versions
+            x = x.permute(1, 0, 2)
+            x = self.transformer_encoder(x)
+            x = x.permute(1, 0, 2) # Back to [Batch, Seq, Dim]
+
+        # 3. Feature Pooling
+        # Extract the first token (index 0) as the sequence representation
+        # This assumes the first token contains the aggregate information (like CLS)
+        first_token_output = x[:, 0, :]
+
+        # 4. Classification Head
         logits = self.linear(first_token_output)
+
+        # 5. Loss Calculation
         loss = None
         if labels is not None:
-            # use stored class_weights if available (not requiring it to be None)
             if hasattr(self, 'class_weights') and self.class_weights is not None:
                 weights = self.class_weights.to(logits.device)
                 loss_fct = nn.CrossEntropyLoss(weight=weights)
             else:
                 loss_fct = nn.CrossEntropyLoss()
+            
             loss = loss_fct(logits, labels.long())
-
+            
             return ModelOutput({'loss': loss, 'logits': logits, 'features': first_token_output})
+
         return ModelOutput({'logits': logits, 'features': first_token_output})
 
 def load_and_tokenize_data(input_faa, tokenizer, sample_source_path, max_length=1024, batch_size=256):
@@ -417,52 +445,85 @@ def main():
     step_start_time = time.time()
     logging.info("Step 1: Loading and tokenizing data...")
 
-    if os.path.exists(embeddings_tensor_path):
-        logging.info("Step 1 skipped: Tokenized data already exists.")
-    else:
-        data, seq_store_pos = load_and_tokenize_data(
-            input_faa=args.input_faa,
-            tokenizer=tokenizer,
-            sample_source_path=args.negative_sample_path,
-            max_length=args.sequence_length,
-            batch_size=args.batch_sizes
-        )
+    # if os.path.exists(embeddings_tensor_path):
+    #     logging.info("Step 1 skipped: Tokenized data already exists.")
+    # else:
+    #     data, seq_store_pos = load_and_tokenize_data(
+    #         input_faa=args.input_faa,
+    #         tokenizer=tokenizer,
+    #         sample_source_path=args.negative_sample_path,
+    #         max_length=args.sequence_length,
+    #         batch_size=args.batch_sizes
+    #     )
 
-        encoded_sequences = data["encoded_sequences"]
-        padded_indices = data["padded_indices"]
+    #     encoded_sequences = data["encoded_sequences"]
+    #     padded_indices = data["padded_indices"]
 
-        num_original_sequences = len(seq_store_pos)
-        num_padded_sequences = len(padded_indices)
-        total_sequences = len(encoded_sequences)
+    #     num_original_sequences = len(seq_store_pos)
+    #     num_padded_sequences = len(padded_indices)
+    #     total_sequences = len(encoded_sequences)
 
-        logging.info("Data loading and tokenization complete.")
-        logging.info(f"Original sequences: {num_original_sequences}, Padded sequences: {num_padded_sequences}, Total sequences: {total_sequences}")
-        logging.info(f"Step 1 completed in {time.time() - step_start_time:.2f} seconds.")
+    #     logging.info("Data loading and tokenization complete.")
+    #     logging.info(f"Original sequences: {num_original_sequences}, Padded sequences: {num_padded_sequences}, Total sequences: {total_sequences}")
+    #     logging.info(f"Step 1 completed in {time.time() - step_start_time:.2f} seconds.")
+
+    data, seq_store_pos = load_and_tokenize_data(
+        input_faa=args.input_faa,
+        tokenizer=tokenizer,
+        sample_source_path=args.negative_sample_path,
+        max_length=args.sequence_length,
+        batch_size=args.batch_sizes
+    )
+
+    encoded_sequences = data["encoded_sequences"]
+    padded_indices = data["padded_indices"]
+
+    num_original_sequences = len(seq_store_pos)
+    num_padded_sequences = len(padded_indices)
+    total_sequences = len(encoded_sequences)
+
+    logging.info("Data loading and tokenization complete.")
+    logging.info(f"Original sequences: {num_original_sequences}, Padded sequences: {num_padded_sequences}, Total sequences: {total_sequences}")
+    logging.info(f"Step 1 completed in {time.time() - step_start_time:.2f} seconds.")
 
     # Step 2: Load model and extract feature embeddings
     step_start_time = time.time()
-    if os.path.exists(results_file) and os.path.exists(positive_fasta_file) and os.path.exists(negative_fasta_file):
+    
+    # Check if final result files already exist
+    all_results_exist = os.path.exists(results_file) and os.path.exists(positive_fasta_file) and os.path.exists(negative_fasta_file)
+    
+    if all_results_exist:
         logging.info("Step 2 skipped: All output files already exist.")
+        # If results exist, attempt to load embeddings for potential use in later steps, or skip.
         if os.path.exists(embeddings_tensor_path):
             logging.info(f"Loading embeddings tensor from {embeddings_tensor_path}")
             embeddings_tensor = torch.load(embeddings_tensor_path)
         else:
-            raise FileNotFoundError(f"Embeddings tensor file not found at {embeddings_tensor_path}.")
+            # Edge case: Results exist but the embeddings tensor is missing.
+            # We proceed without it, assuming it might not be needed if Step 3 is also skipped.
+            logging.warning(f"Embeddings tensor not found, but results exist. Proceeding...")
+            embeddings_tensor = None 
     else:
-        logging.info("Step 2: Loading model and extracting features...")
-        pretrain_path = os.path.join(esmt12_dir, 'model.safetensors')
-        model = LRVMForClf(esmt12_dir, pretrain_path, 2)
+        # Results do not exist, so embeddings are required.
+        # Check if embeddings were already computed (e.g., in a re-run) to avoid recalculation.
+        if os.path.exists(embeddings_tensor_path):
+            logging.info(f"Step 2: Found existing embeddings at {embeddings_tensor_path}. Loading...")
+            embeddings_tensor = torch.load(embeddings_tensor_path)
+        else:
+            logging.info("Step 2: Loading model and extracting features...")
+            pretrain_path = os.path.join(esmt12_dir, 'model.safetensors')
+            model = LRVMForClf(esmt12_dir, pretrain_path, 2)
 
-        embeddings_tensor = extract_features(
-            model=model,
-            encoded_sequences=encoded_sequences,
-            step_size=args.batch_sizes,
-            device=args.device,
-            padded_indices=padded_indices,
-        )
+            embeddings_tensor = extract_features(
+                model=model,
+                encoded_sequences=encoded_sequences, 
+                step_size=args.batch_sizes,
+                device=args.device,
+                padded_indices=padded_indices,
+            )
 
-        torch.save(embeddings_tensor, embeddings_tensor_path)
-        logging.info(f"Feature embeddings saved to {embeddings_tensor_path}")
+            torch.save(embeddings_tensor, embeddings_tensor_path)
+            logging.info(f"Feature embeddings saved to {embeddings_tensor_path}")
     
     logging.info(f"Step 2 completed in {time.time() - step_start_time:.2f} seconds.")
     

@@ -227,6 +227,7 @@ common_ids_ICTV_Lucaprot.txt
 
 #py
 predict_pipline_light.py
+predict_pipeline_old.py
 
 #dir
 revision_1
