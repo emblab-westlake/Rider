@@ -234,7 +234,7 @@ predict_pipeline_old.py
 
 #dir
 revision_1
-docs
+docs/data
 checkpoint-6000
 checkpoint-9600
 
