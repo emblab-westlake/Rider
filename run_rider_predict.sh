@@ -10,8 +10,8 @@ cd "$SCRIPT_PATH"
 
 # input, output paths and model weights
 INPUT_DIR="$SCRIPT_PATH/test_data"                          # input dir
-OUTPUT_PATH="$SCRIPT_PATH/test_data/test_results"           # output dir
-WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-44000/model.safetensors"
+OUTPUT_PATH="$SCRIPT_PATH/test_data/test_long_results"           # output dir
+WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-19600/model.safetensors"
 RDRP_DB="/usr/commondata/public/gaoyang/Rider_pdb_database/Rider_pdb_database/database" #change this to your own path
 SUBMODULE_DIR="$SCRIPT_PATH/submodule"
 
@@ -21,7 +21,7 @@ echo "Input dir: $INPUT_DIR"
 echo "Output dir: $OUTPUT_PATH"
 
 # loop through all .faa files in the input directory
-for i in "$INPUT_DIR"/*faa; do
+for i in "$INPUT_DIR"/long_seq.faa; do
     base=$(basename "$i")
     File_path=$(dirname "$i")
     out_dir="${OUTPUT_PATH}/${base}"
@@ -31,12 +31,12 @@ for i in "$INPUT_DIR"/*faa; do
 
     # run rider-predict 
     # Set CUDA_VISIBLE_DEVICES to specify which GPU to use
-    CUDA_VISIBLE_DEVICES=0 \
+    CUDA_VISIBLE_DEVICES=1 \
     rider-predict \
         -i "$i" \
         -t 32 \
         -w "$WEIGHTS" \
-        -b 64 \
+        -b 1 \
         --device cuda \
         -o "$OUTPUT_PATH" \
         --submodule_dir "$SUBMODULE_DIR" \
@@ -46,7 +46,8 @@ for i in "$INPUT_DIR"/*faa; do
         --rdrp_structure_database "$RDRP_DB" \
         --prob_threshold 50 \
         --top_n_mean_prob 2 \
-        --alignment-type 1
+        --alignment-type 1 \
+        --threshold 0.8
 
     echo "Finished: $i"
     echo "--------------------------------------------"

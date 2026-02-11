@@ -90,7 +90,7 @@ def generate_pdb(record, model, output_dir, sequence_length):
     return pdb_file, elapsed_time
 
 # Batch processing function
-def process_faa_files(input_dir, sequence_length, model, max_workers=1, suffix="_Rider_predicted_RNA_Virus_potential_candidates.faa"):
+def process_faa_files(input_dir, sequence_length, model, max_workers=1, suffix="_Rider_predicted_RNA_Virus_potential_candidates.split.faa"):
     """
     Batch process .faa files in the intermediate_dir of each subdirectory to generate corresponding PDB files.
 

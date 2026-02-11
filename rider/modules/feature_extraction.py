@@ -57,23 +57,30 @@ def extract_features(
     with torch.no_grad():
         with tqdm(total=max_size, desc="Extracting features", unit="seq", colour="green") as pbar:
             while start < max_size:
+                end = min(start + step_size, max_size)
                 # Build current batch
-                if start + step_size <= max_size:
-                    input_id = encoded_sequences["input_ids"][start:start + step_size].to(device)
-                else:
-                    input_id = encoded_sequences["input_ids"][start:max_size].to(device)
+                batch_input_ids = encoded_sequences["input_ids"][start:end]
+                batch_attention_mask = encoded_sequences["attention_mask"][start:end]
+                
+                if not isinstance(batch_input_ids, torch.Tensor):
+                    batch_input_ids = torch.tensor(batch_input_ids)
+                if not isinstance(batch_attention_mask, torch.Tensor):
+                    batch_attention_mask = torch.tensor(batch_attention_mask)
+                    
+                input_id = batch_input_ids.to(device)
+                att_mask = batch_attention_mask.to(device)
 
                 # Forward pass through the model
-                outputs = model(input_id)
+                outputs = model(input_id, attention_mask=att_mask)
                 features = outputs.features.cpu().numpy()  # Extract embeddings
                 embeddings.append(features)
 
                 # Free memory
-                del input_id
+                del input_id, att_mask, outputs
                 torch.cuda.empty_cache()
 
                 # Update progress
-                processed = min(step_size, max_size - start)
+                processed = end - start
                 start += processed
                 pbar.update(processed)
 

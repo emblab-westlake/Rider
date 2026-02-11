@@ -29,6 +29,7 @@ from transformers.utils import ModelOutput
 from Bio import SeqIO
 from safetensors.torch import load_model
 from datasets import Dataset
+from typing import Dict, List
 import argparse
 import logging
 from rider.utils.download import ensure_data_exists
@@ -55,7 +56,7 @@ default_submodule_path = os.path.join(USER_DATA_DIR, "submodule")
 # Set default path for the Foldseek RDRP structure database
 default_rdrp_db_path = os.path.join(USER_DATA_DIR, "Rider_pdb_database", "database")
 # Set default path for weight
-default_weight_path=os.path.join(project_root, "checkpoint", "checkpoint-4400","model.safetensors") #Rider/checkpoint/checkpoint-102000/model.safetensors
+default_weight_path=os.path.join(project_root, "checkpoint", "checkpoint-19600","model.safetensors") #Rider/checkpoint/checkpoint-102000/model.safetensors
 
 # parse arg
 def parse_args():
@@ -125,8 +126,9 @@ class LRVMForMaskedLM(nn.Module):
         self.ln = nn.Linear(480, 33)
         self.celoss = nn.CrossEntropyLoss(ignore_index=-100)
     
-    def forward(self, input_ids):
-        x = self.esm(**{'input_ids': input_ids})['last_hidden_state']
+    def forward(self, input_ids, attention_mask ):
+        output = self.esm(input_ids=input_ids, attention_mask=attention_mask)
+        x = output['last_hidden_state']
         logits = x
         loss = torch.tensor(0.0) 
         return ModelOutput({'logits': logits, 'loss': loss})
@@ -139,8 +141,9 @@ class LRVMForClf(nn.Module):
         self.ln = nn.Linear(480, clf_class)
         self.celoss = nn.CrossEntropyLoss(ignore_index=-100)
     
-    def forward(self, input_ids):
-        x = self.LRVM(**{'input_ids': input_ids})['logits'][:, 0, :]
+    def forward(self, input_ids, attention_mask=None):
+        lrvm_out = self.LRVM(input_ids=input_ids, attention_mask=attention_mask)
+        x = lrvm_out['logits'][:, 0, :] 
         features = x
         x = self.ln(features)
         logits = x
@@ -170,13 +173,11 @@ class SimpleClassifier(nn.Module):
                 nhead=nhead,
                 dim_feedforward=hidden_dim,
                 dropout=dropout,
-                batch_first=True  # better performance and avoids nested tensor warning
+                batch_first=True  
             )
             self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-            # 【关键修改】：显式定义 self.batch_first = True
             self.batch_first = True 
         except TypeError:
-            # older PyTorch: batch_first not supported, fall back
             encoder_layer = nn.TransformerEncoderLayer(
                 d_model=input_dim,
                 nhead=nhead,
@@ -184,7 +185,6 @@ class SimpleClassifier(nn.Module):
                 dropout=dropout
             )
             self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-            # 【关键修改】：显式定义 self.batch_first = False
             self.batch_first = False
 
         self.linear = nn.Linear(input_dim, output_dim)
@@ -317,57 +317,175 @@ def load_and_tokenize_data(input_faa, tokenizer, sample_source_path, max_length=
     }, seq_store
 
 
-def save_predicted_genes(output_dir, file_name, seq_store_pos, target_positive_record_id, target_negative_record_id, input_faa):
-    """
-    Save predicted gene results to the specified directory, including:
-    - All prediction results file
-    - FASTA file for RNA virus candidate sequences
-    - FASTA file for non-RNA virus sequences
+# def save_predicted_genes(output_dir, file_name, seq_store_pos, target_positive_record_id, target_negative_record_id, input_faa):
+#     """
+#     Save predicted gene results to the specified directory, including:
+#     - All prediction results file
+#     - FASTA file for RNA virus candidate sequences
+#     - FASTA file for non-RNA virus sequences
 
-    Args:
-    - output_dir: Output directory
-    - file_name: Base name for output files (derived from input file)
-    - seq_store_pos: Dictionary of sequences {id: sequence}
-    - target_positive_record_id: List of sequence IDs predicted as positive
-    - target_negative_record_id: List of sequence IDs predicted as negative
-    - input_faa: Path to the original input FASTA file
+#     This version removes '*' characters from sequences (common when prodigal puts a terminal '*').
+
+#     Args:
+#     - output_dir: Output directory
+#     - file_name: Base name for output files (derived from input file)
+#     - seq_store_pos: Dictionary of sequences {id: sequence}
+#     - target_positive_record_id: List of sequence IDs predicted as positive
+#     - target_negative_record_id: List of sequence IDs predicted as negative
+#     - input_faa: Path to the original input FASTA file
+#     """
+#     def clean_sequence(seq: str) -> str:
+#         """
+#         Clean sequence string by removing '*' characters and trimming whitespace.
+#         Currently removes all '*' characters. If you want to remove only trailing '*',
+#         change to: return seq.rstrip().rstrip('*').rstrip()
+#         """
+#         if seq is None:
+#             return ""
+#         # Remove all '*' and strip whitespace/newlines
+#         return seq.replace('*', '').strip()
+
+#     start_time = time.time()
+
+#     # Ensure output directory exists
+#     os.makedirs(output_dir, exist_ok=True)
+
+#     # Save all prediction results to a text file
+#     results_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_results.txt")
+#     with open(results_file, "w") as f:
+#         for i in target_positive_record_id:
+#             raw_seq = seq_store_pos.get(i, "")
+#             seq = clean_sequence(raw_seq)
+#             f.write(i + "\t" + seq + "\t" + str(1) + "\n")
+#         for j in target_negative_record_id:
+#             raw_seq = seq_store_pos.get(j, "")
+#             seq = clean_sequence(raw_seq)
+#             f.write(j + "\t" + seq + "\t" + str(0) + "\n")
+#     logging.info(f"Predicted results saved to: {results_file}")
+
+#     # Save RNA virus candidate sequences in FASTA format
+#     positive_fasta_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.faa")
+#     with open(positive_fasta_file, "w") as f:
+#         for i in target_positive_record_id:
+#             raw_seq = seq_store_pos.get(i, "")
+#             seq = clean_sequence(raw_seq)
+#             f.write(">Rider_" + i + "\n")
+#             f.write(seq + "\n")
+#     logging.info(f"RNA Virus candidates saved to: {positive_fasta_file}")
+
+#     # Save non-RNA virus sequences in FASTA format
+#     negative_fasta_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_nonRNA.faa")
+#     with open(negative_fasta_file, "w") as f:
+#         for j in target_negative_record_id:
+#             raw_seq = seq_store_pos.get(j, "")
+#             seq = clean_sequence(raw_seq)
+#             f.write(">" + j + "\n")
+#             f.write(seq + "\n")
+#     logging.info(f"Non-RNA sequences saved to: {negative_fasta_file}")
+
+#     # Log completion info
+#     logging.info(f"{input_faa} done.")
+#     end_time = time.time()
+#     elapsed_time = end_time - start_time
+#     logging.info(f"Saving predicted genes completed in {elapsed_time:.2f} seconds.")
+
+def save_predicted_genes(
+    output_dir: str,
+    file_name: str,
+    seq_store_pos: Dict[str, str],
+    target_positive_record_id: List[str],
+    target_negative_record_id: List[str],
+    input_faa: str,
+    window_size: int = 1000,
+    generate_split_faa: bool = True
+):
     """
+    Save predicted gene results and FASTA files.
+
+    - Keeps original positive FASTA: {file_name}_Rider_predicted_RNA_Virus_potential_candidates.faa
+      with headers exactly >Rider_<orig_id>.
+    - Creates split FASTA: {file_name}_Rider_predicted_RNA_Virus_potential_candidates.split.faa
+      with headers >Rider_<orig_id>_<part_idx>;<start>-<end> (1-based inclusive).
+    """
+    def clean_sequence(seq: str) -> str:
+        if seq is None:
+            return ""
+        return seq.replace('*', '').strip()
+
     start_time = time.time()
-
-    # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
-    # Save all prediction results to a text file
+    # 1) Save predicted results text (unchanged)
     results_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_results.txt")
     with open(results_file, "w") as f:
-        for i in target_positive_record_id:
-            f.write(i + "\t" + seq_store_pos[i] + "\t" + str(1) + "\n")
-        for j in target_negative_record_id:
-            f.write(j + "\t" + seq_store_pos[j] + "\t" + str(0) + "\n")
+        for seq_id in target_positive_record_id:
+            raw_seq = seq_store_pos.get(seq_id, "")
+            seq = clean_sequence(raw_seq)
+            f.write(f"{seq_id}\t{seq}\t1\n")
+        for seq_id in target_negative_record_id:
+            raw_seq = seq_store_pos.get(seq_id, "")
+            seq = clean_sequence(raw_seq)
+            f.write(f"{seq_id}\t{seq}\t0\n")
     logging.info(f"Predicted results saved to: {results_file}")
 
-    # Save RNA virus candidate sequences in FASTA format
+    # 2) Save original positive FASTA (unchanged headers and sequences)
     positive_fasta_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.faa")
-    with open(positive_fasta_file, "w") as f:
-        for i in target_positive_record_id:
-            f.write(">Rider_" + i + "\n")
-            f.write(seq_store_pos[i] + "\n")
-    logging.info(f"RNA Virus candidates saved to: {positive_fasta_file}")
+    with open(positive_fasta_file, "w") as pf:
+        for seq_id in target_positive_record_id:
+            raw_seq = seq_store_pos.get(seq_id, "")
+            seq = clean_sequence(raw_seq)
+            pf.write(f">Rider_{seq_id}\n")
+            pf.write(seq + "\n")
+    logging.info(f"RNA Virus candidates (original full sequences) saved to: {positive_fasta_file}")
 
-    # Save non-RNA virus sequences in FASTA format
+    # 3) Generate split FASTA with headers >Rider_<orig_id>_<part_idx>;<start>-<end>
+    split_fasta_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.split.faa")
+    split_info_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.split_info.txt")
+
+    if generate_split_faa:
+        with open(split_fasta_file, "w") as sf, open(split_info_file, "w") as sif:
+            sif.write("orig_id\torig_len\tpart_idx\tstart\tend\tpart_len\n")
+            for seq_id in target_positive_record_id:
+                raw_seq = seq_store_pos.get(seq_id, "")
+                seq = clean_sequence(raw_seq)
+                L = len(seq)
+                if L == 0:
+                    sif.write(f"{seq_id}\t0\t\t\t\t\n")
+                    continue
+                n_parts = (L + window_size - 1) // window_size  # ceil
+                for part_idx in range(n_parts):
+                    start0 = part_idx * window_size        # 0-based inclusive
+                    end0 = min(start0 + window_size, L)   # 0-based exclusive
+                    start_1 = start0 + 1
+                    end_1 = end0
+                    sub_seq = seq[start0:end0]
+                    part_len = len(sub_seq)
+
+                    # Header: append _<part_idx> to orig id, then ;start-end
+                    modified_id = f"{seq_id}_{part_idx+1}"
+                    header = f">Rider_{modified_id};{start_1}-{end_1}"
+                    sf.write(header + "\n")
+                    sf.write(sub_seq + "\n")
+
+                    sif.write(f"{seq_id}\t{L}\t{part_idx+1}\t{start_1}\t{end_1}\t{part_len}\n")
+        logging.info(f"Split FASTA saved to: {split_fasta_file}")
+        logging.info(f"Split info saved to: {split_info_file}")
+    else:
+        logging.info("generate_split_faa is False; no split FASTA produced.")
+
+    # 4) Save negative FASTA (unchanged)
     negative_fasta_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_nonRNA.faa")
-    with open(negative_fasta_file, "w") as f:
-        for j in target_negative_record_id:
-            f.write(">" + j + "\n")
-            f.write(seq_store_pos[j] + "\n")
+    with open(negative_fasta_file, "w") as nf:
+        for seq_id in target_negative_record_id:
+            raw_seq = seq_store_pos.get(seq_id, "")
+            seq = clean_sequence(raw_seq)
+            nf.write(f">{seq_id}\n")
+            nf.write(seq + "\n")
     logging.info(f"Non-RNA sequences saved to: {negative_fasta_file}")
 
-    # Log completion info
     logging.info(f"{input_faa} done.")
-    end_time = time.time()
-    elapsed_time = end_time - start_time
+    elapsed_time = time.time() - start_time
     logging.info(f"Saving predicted genes completed in {elapsed_time:.2f} seconds.")
-
 def main():
     # Get the path of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))

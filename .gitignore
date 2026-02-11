@@ -210,9 +210,12 @@ plot_draw
 tmp_tensors
 
 #testdata
-test_results
-test_data
+test_results*
 time_test
+cronavirus
+*test_results
+long_seq*
+test.faa
 
 #checkpoint
 delete
@@ -231,4 +234,7 @@ predict_pipeline_old.py
 
 #dir
 revision_1
+docs
+checkpoint-6000
+checkpoint-9600
 
