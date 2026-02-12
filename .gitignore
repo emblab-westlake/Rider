@@ -216,6 +216,7 @@ cronavirus
 *test_results
 long_seq*
 test.faa
+test_long_results
 
 #checkpoint
 delete
@@ -231,6 +232,7 @@ common_ids_ICTV_Lucaprot.txt
 #py
 predict_pipline_light.py
 predict_pipeline_old.py
+*old.py
 
 #dir
 revision_1

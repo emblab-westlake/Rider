@@ -515,7 +515,7 @@ def main():
     # Model paths
     esmfold_dir=os.path.join(project_root,"submodule", "esmfold_v1")
     esmt12_dir=os.path.join(project_root,"submodule", "esm2_t12_35M_UR50D")
-    known_rdrp = os.path.join(script_dir, "databases", "NCBI_RNA_virus_refseq.fasta")
+    known_rdrp = os.path.join(script_dir, "databases", "ICTV_RNA_Virus_21.faa")
 
     # Output file paths
     results_file = os.path.join(tmp_dir, f"{file_name}_Rider_predicted_results.txt")

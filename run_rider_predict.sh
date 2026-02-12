@@ -21,7 +21,7 @@ echo "Input dir: $INPUT_DIR"
 echo "Output dir: $OUTPUT_PATH"
 
 # loop through all .faa files in the input directory
-for i in "$INPUT_DIR"/long_seq.faa; do
+for i in "$INPUT_DIR"/test_AJ004930_1.faa; do
     base=$(basename "$i")
     File_path=$(dirname "$i")
     out_dir="${OUTPUT_PATH}/${base}"
@@ -45,9 +45,9 @@ for i in "$INPUT_DIR"/long_seq.faa; do
         --structure_align_enabled \
         --rdrp_structure_database "$RDRP_DB" \
         --prob_threshold 50 \
-        --top_n_mean_prob 2 \
+        --top_n_mean_prob 5 \
         --alignment-type 1 \
-        --threshold 0.8
+        --threshold 0.9
 
     echo "Finished: $i"
     echo "--------------------------------------------"
