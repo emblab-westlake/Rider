@@ -78,7 +78,7 @@ def parse_args():
     parser.add_argument("--structure_model_path", type=str, 
                         help="Path to the structure prediction model.")
     parser.add_argument("--threshold", type=float, default=0.9, 
-                        help="Threshold value for classification (default: 0.95). \
+                        help="Threshold value for classification (For normal mode, default: 0.9). \
                             We suggest 0.99 as a conservative threshold to reduce false positives in real-world metagtranscriptomic data.\
                             Lower thresholds (e.g., 0.9) may increase sensitivity but also false positives.")
     parser.add_argument("--device", type=str, default="cuda", 

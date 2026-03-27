@@ -4,5 +4,5 @@ This directory contains visual representations of the Rider model architecture a
 
 ## Files
 
-- `workflow.png` - Main pipeline workflow showing the complete data flow
+- `Rider_workflow.png` - Main pipeline workflow showing the complete data flow
 ```

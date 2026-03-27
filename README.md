@@ -108,13 +108,13 @@ Rider/
     └── esmfold_v1/  
     └── esm2_t12_35M_UR50D
     └── foldseek 
-└── Rider_pdb_database/
-    └── database/ 
+└── RDSDB/ #Rider RdRp-domain-specific Database
+    └── pdbs/ 
 ```
 
 Alternatively, pass a custom path using:
 ```sh
---rdrp_structure_database /your/custom/path/database
+--rdrp_structure_database /your/custom/path/pdbs
 ```
 Note: Foldseek and mmseqs2 are external binaries. Rider attempts to add submodule/foldseek/bin to PATH, but mmseqs2 usually needs separate installation (e.g., conda: `conda install -c bioconda mmseqs2`). Verify with `which mmseqs` and `mmseqs --version`.
 
@@ -129,8 +129,8 @@ SCRIPT_PATH=$(dirname $(readlink -f "$0"))
 # input, output paths and model weights
 INPUT_DIR="$SCRIPT_PATH/test_data"                          # input dir
 OUTPUT_PATH="$SCRIPT_PATH/test_data/test_results"           # output dir
-WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-44000/model.safetensors"
-RDRP_DB="/usr/commondata/public/gaoyang/Rider_pdb_database/Rider_pdb_database/database" #change this to your own path
+WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-19600/model.safetensors"
+RDRP_DB="$SCRIPT_PATH/RDSDB/pdbs" #change this to your own path
 SUBMODULE_DIR="$SCRIPT_PATH/submodule"
 
 # Debug output
@@ -138,8 +138,7 @@ echo "Using weights from: $WEIGHTS"
 echo "Input dir: $INPUT_DIR"
 echo "Output dir: $OUTPUT_PATH"
 
-# loop through all .faa files in the input directory
-for i in "$INPUT_DIR"/*faa; do
+for i in "$INPUT_DIR"/test_AJ004930_1.faa; do
     base=$(basename "$i")
     File_path=$(dirname "$i")
     out_dir="${OUTPUT_PATH}/${base}"
@@ -149,23 +148,25 @@ for i in "$INPUT_DIR"/*faa; do
 
     # run rider-predict 
     # Set CUDA_VISIBLE_DEVICES to specify which GPU to use
-    # change device to cpu or cuda if you want to use GPU (--device cpu or cuda)
-    CUDA_VISIBLE_DEVICES=0 \
+    CUDA_VISIBLE_DEVICES=1 \
     rider-predict \
         -i "$i" \
         -t 32 \
         -w "$WEIGHTS" \
-        -b 64 \
-        --device cpu \
+        -b 1 \
+        --device cuda \
         -o "$OUTPUT_PATH" \
+        --threads 32 \
         --submodule_dir "$SUBMODULE_DIR" \
         --predict_structure \
         --sequence_length 1024 \
         --structure_align_enabled \
         --rdrp_structure_database "$RDRP_DB" \
         --prob_threshold 50 \
-        --top_n_mean_prob 2 \
-        --alignment-type 1
+        --threshold_type 1 \
+        --top_n_mean_prob 5 \
+        --alignment-type 1 \
+        --threshold 0.9
 
     echo "Finished: $i"
     echo "--------------------------------------------"
@@ -217,6 +218,9 @@ Foldseek alignment type parameter (passed to the alignment runner).
 
 - `--prob_threshold` (int, default=50)
 Homology probability threshold (percentage) used to filter Foldseek results.
+
+- `--threshold_type` (int, default=1, choices=[1, 2, 3, 4])
+Filtering type: 1=bits, 2=ttmscore, 3=qtmscore, 4=max(ttmscore, qtmscore). For tmscore, the threshold is 'prob_threshold/100'.
 
 - `--top_n_mean_prob` (int, default=1)
 Number of top hits to average when computing homology probability. Higher values make validation stricter.
