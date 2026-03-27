@@ -10,9 +10,9 @@ cd "$SCRIPT_PATH"
 
 # input, output paths and model weights
 INPUT_DIR="$SCRIPT_PATH/test_data"                          # input dir
-OUTPUT_PATH="$SCRIPT_PATH/test_data/test_long_results"           # output dir
+OUTPUT_PATH="$SCRIPT_PATH/test_data/test_results"           # output dir
 WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-19600/model.safetensors"
-RDRP_DB="/usr/commondata/public/gaoyang/Rider_pdb_database/Rider_pdb_database/database" #change this to your own path
+RDRP_DB="$SCRIPT_PATH/Rider_RDSDB_30/pdbs" #change this to your own path contains .pdb files
 SUBMODULE_DIR="$SCRIPT_PATH/submodule"
 
 # Debug output
@@ -39,12 +39,14 @@ for i in "$INPUT_DIR"/test_AJ004930_1.faa; do
         -b 1 \
         --device cuda \
         -o "$OUTPUT_PATH" \
+        --threads 32 \
         --submodule_dir "$SUBMODULE_DIR" \
         --predict_structure \
         --sequence_length 1024 \
         --structure_align_enabled \
         --rdrp_structure_database "$RDRP_DB" \
         --prob_threshold 50 \
+        --threshold_type 1 \
         --top_n_mean_prob 5 \
         --alignment-type 1 \
         --threshold 0.9

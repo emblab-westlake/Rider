@@ -38,7 +38,7 @@ from rider.modules.mmcluster import mmseqs2_clustering
 from rider.modules.classification import classify_genes
 from rider.modules.feature_extraction import extract_features
 from rider.modules.structure_align import Structure_aligned
-from rider.modules.filter_prob_taxonomy import process_fixed_prob_out_folders
+from rider.modules.filter_prob_taxonomy_with_seq import process_fixed_prob_out_folders
 from rider.modules.parse_result import process_final_result  
 
 # logging
@@ -67,7 +67,7 @@ def parse_args():
                         help="Path to the model weights.")
     parser.add_argument("-b", "--batch_sizes", type=int, default=64, 
                         help="Batch size for processing.")
-    parser.add_argument("-t", "--threads", type=int, default=16, 
+    parser.add_argument("-t", "--threads", type=str, default=32, 
                         help="Number of CPU threads to use.")
     parser.add_argument("-o", "--output_dir", type=str, default="./", 
                         help="Output directory.")
@@ -95,6 +95,8 @@ def parse_args():
                         help="Foldseek alignment type parameter.")
     parser.add_argument("--prob_threshold", type=int, default=50, 
                         help="Homologous probability threshold default 50.")
+    parser.add_argument("--threshold_type", type=int, default=1, choices=[1, 2, 3, 4],
+                        help="Filtering type: 1=bits, 2=ttmscore, 3=qtmscore, 4=max(ttmscore, qtmscore). For tmscore, the threshold is prob_threshold/100.")
     parser.add_argument("--top_n_mean_prob", type=int, default=1, 
                         help="Usually the at least top 1 query above the homo prob threshold, you can choose 2 or more to obtain more strict results.")
     
@@ -438,36 +440,107 @@ def save_predicted_genes(
             pf.write(seq + "\n")
     logging.info(f"RNA Virus candidates (original full sequences) saved to: {positive_fasta_file}")
 
+    # # 3) Generate split FASTA with headers >Rider_<orig_id>_<part_idx>;<start>-<end>
+    # split_fasta_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.split.faa")
+    # split_info_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.split_info.txt")
+
+    # if generate_split_faa:
+    #     with open(split_fasta_file, "w") as sf, open(split_info_file, "w") as sif:
+    #         sif.write("orig_id\torig_len\tpart_idx\tstart\tend\tpart_len\n")
+    #         for seq_id in target_positive_record_id:
+    #             raw_seq = seq_store_pos.get(seq_id, "")
+    #             seq = clean_sequence(raw_seq)
+    #             L = len(seq)
+    #             if L == 0:
+    #                 sif.write(f"{seq_id}\t0\t\t\t\t\n")
+    #                 continue
+    #             n_parts = (L + window_size - 1) // window_size  # ceil
+    #             for part_idx in range(n_parts):
+    #                 start0 = part_idx * window_size        # 0-based inclusive
+    #                 end0 = min(start0 + window_size, L)   # 0-based exclusive
+    #                 start_1 = start0 + 1
+    #                 end_1 = end0
+    #                 sub_seq = seq[start0:end0]
+    #                 part_len = len(sub_seq)
+
+    #                 # Header: append _<part_idx> to orig id, then ;start-end
+    #                 modified_id = f"{seq_id}_{part_idx+1}"
+    #                 header = f">Rider_{modified_id};{start_1}-{end_1}"
+    #                 sf.write(header + "\n")
+    #                 sf.write(sub_seq + "\n")
+
+    #                 sif.write(f"{seq_id}\t{L}\t{part_idx+1}\t{start_1}\t{end_1}\t{part_len}\n")
+    #     logging.info(f"Split FASTA saved to: {split_fasta_file}")
+    #     logging.info(f"Split info saved to: {split_info_file}")
+    # else:
+    #     logging.info("generate_split_faa is False; no split FASTA produced.")
+    
     # 3) Generate split FASTA with headers >Rider_<orig_id>_<part_idx>;<start>-<end>
     split_fasta_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.split.faa")
     split_info_file = os.path.join(output_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.split_info.txt")
 
+    # --- Set sliding window parameters ---
+    # window_size is defined externally (e.g. 1000)
+    overlap_size = 500  # size of the overlap region
+    step_size = window_size - overlap_size  # step length (e.g. 1000 - 500 = 500)
+
+    # Prevent infinite loop when step_size <= 0 (if window_size <= overlap_size, step must be at least 1)
+    if step_size <= 0:
+        step_size = window_size
+
     if generate_split_faa:
         with open(split_fasta_file, "w") as sf, open(split_info_file, "w") as sif:
             sif.write("orig_id\torig_len\tpart_idx\tstart\tend\tpart_len\n")
+            
             for seq_id in target_positive_record_id:
                 raw_seq = seq_store_pos.get(seq_id, "")
                 seq = clean_sequence(raw_seq)
                 L = len(seq)
+                
                 if L == 0:
                     sif.write(f"{seq_id}\t0\t\t\t\t\n")
                     continue
-                n_parts = (L + window_size - 1) // window_size  # ceil
-                for part_idx in range(n_parts):
-                    start0 = part_idx * window_size        # 0-based inclusive
-                    end0 = min(start0 + window_size, L)   # 0-based exclusive
+                
+                # --- Revised sliding-window logic ---
+                part_counter = 0  # manual counter used to generate _1, _2, etc.
+                
+                # Slide using range(start, stop, step)
+                # e.g. for L=2000, step=500: 0, 500, 1000, 1500...
+                for start0 in range(0, L, step_size):
+                    
+                    # Compute end position, not exceeding sequence length
+                    end0 = min(start0 + window_size, L)
+                    
+                    # Extract subsequence
+                    sub_seq = seq[start0:end0]
+                    
+                    # Skip if the extracted subsequence is empty (rare edge case)
+                    if not sub_seq:
+                        continue
+                    
+                    # Increment counter only when extraction succeeds
+                    part_counter += 1
+                    
                     start_1 = start0 + 1
                     end_1 = end0
-                    sub_seq = seq[start0:end0]
                     part_len = len(sub_seq)
 
-                    # Header: append _<part_idx> to orig id, then ;start-end
-                    modified_id = f"{seq_id}_{part_idx+1}"
+                    # Header: append _<part_counter> to original id, then ;start-end
+                    modified_id = f"{seq_id}_{part_counter}"
                     header = f">Rider_{modified_id};{start_1}-{end_1}"
+                    
                     sf.write(header + "\n")
                     sf.write(sub_seq + "\n")
 
-                    sif.write(f"{seq_id}\t{L}\t{part_idx+1}\t{start_1}\t{end_1}\t{part_len}\n")
+                    sif.write(f"{seq_id}\t{L}\t{part_counter}\t{start_1}\t{end_1}\t{part_len}\n")
+                    
+                    # Optimization: if the current window reached the end (end0 == L),
+                    # and you do not want to produce a very short fragment that is contained within
+                    # the last full window, you can break here.
+                    # However, to ensure coverage of all positions, keeping the default behavior is usually preferred.
+                    if end0 == L:
+                        break
+
         logging.info(f"Split FASTA saved to: {split_fasta_file}")
         logging.info(f"Split info saved to: {split_info_file}")
     else:
@@ -722,6 +795,7 @@ def main():
             database_dir=args.rdrp_structure_database,
             alignment_type=args.alignment_type,
             sequence_length=args.sequence_length,
+            threads_use=args.threads
         )
         foldseek_runner.foldseek_batch()
         logging.info("Foldseek alignment completed.")
@@ -729,7 +803,7 @@ def main():
         logging.info("Foldseek alignment is disabled.")
     logging.info(f"Step 6 completed in {time.time() - step_start_time:.2f} seconds.")
 
-    # Step 7: Filter queries based on Foldseek results
+    # Step 7 & 8: Filter queries based on Foldseek results & Extract final candidate sequences
     step_start_time = time.time()
     if args.predict_structure:
         logging.info("Step 7: Filtering queries based on Foldseek results...")
@@ -737,22 +811,24 @@ def main():
             input_root_dir=args.output_dir,
             alignment_type=args.alignment_type,
             n=args.top_n_mean_prob,
-            prob_threshold=args.prob_threshold
+            prob_threshold=args.prob_threshold,
+            threshold_type=args.threshold_type
         )
         logging.info("Filtering completed.")
+        logging.info("Extraction final candidate completed.")
     else:
         logging.info("Structure prediction is disabled; filtering queries is skipped.")
     logging.info(f"Step 7 completed in {time.time() - step_start_time:.2f} seconds.")
 
-    # Step 8: Extract final candidate sequences
-    step_start_time = time.time()
-    if args.predict_structure:
-        logging.info("Step 8: Extracting sequences for final candidates...")
-        process_final_result(args.output_dir, sample_name=file_name)
-        logging.info("Sequence extraction completed.")
-    else:
-        logging.info("Sequence extraction is disabled.")
-    logging.info(f"Step 8 completed in {time.time() - step_start_time:.2f} seconds.")
+    # # Step 8: Extract final candidate sequences
+    # step_start_time = time.time()
+    # if args.predict_structure:
+    #     logging.info("Step 8: Extracting sequences for final candidates...")
+    #     process_final_result(args.output_dir, sample_name=file_name)
+    #     logging.info("Sequence extraction completed.")
+    # else:
+    #     logging.info("Sequence extraction is disabled.")
+    # logging.info(f"Step 8 completed in {time.time() - step_start_time:.2f} seconds.")
         
     # Final execution time
     elapsed_time = time.time() - overall_start_time

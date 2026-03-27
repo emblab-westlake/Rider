@@ -3,9 +3,6 @@
 Script Name: structure_align.py
 Version: 1.0.0
 Author: Gaoyang Luo
-Contact information: lgyjsnjhit@gmail.com
-                     luogaoyang@westlake.edu.cn
-                     gaoyang.luo@unsw.edu.au
 Created Date: 2024-11-20
 Last Modified Date: 2024-11-23
 Description: 
@@ -21,7 +18,7 @@ import time
 import logging
 
 class Structure_aligned:
-    def __init__(self, input_dir, database_dir, sequence_length, alignment_type=1):
+    def __init__(self, input_dir, database_dir, sequence_length, alignment_type=1, threads_use=32):
         """
         Initialize the Structure_aligned class.
 
@@ -34,6 +31,7 @@ class Structure_aligned:
         self.database_dir = database_dir
         self.alignment_type = alignment_type
         self.sequence_length = sequence_length
+        self.threads_use = threads_use
 
     def run_foldseek(self, input_pdb_dir, output_file, tmp_dir):
         """
@@ -50,6 +48,7 @@ class Structure_aligned:
             output_file,                  # Output file path
             tmp_dir,                      # Temporary directory
             "--alignment-type", str(self.alignment_type),  # Alignment type parameter
+            "--threads", str(self.threads_use), # cpu threads
             "--format-output", "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,lddt,ttmscore,bits,qtmscore"
         ]
 
