@@ -98,7 +98,7 @@ Rider depends on the following:
 This database is required for structural alignment using Foldseek (step 6/7).
 
 📥 How to prepare:
-1. Download the prebuilt dependencies and database manually (Zenodo: https://doi.org/10.5281/zenodo.15742756) or follow your internal distribution process. We are preparing this...
+1. Download the prebuilt dependencies and database manually (Zenodo: https://doi.org/10.5281/zenodo.19247869) or follow your internal distribution process. We are keep updating.
 2. Place it under the Rider folder like this:
 
 ✅ Required layout:
