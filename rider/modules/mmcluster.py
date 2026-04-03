@@ -7,9 +7,9 @@ Contact information: lgyjsnjhit@gmail.com
                      luogaoyang@westlake.edu.cn
                      gaoyang.luo@unsw.edu.au
 Created Date: 2024-11-20
-Last Modified Date: 2024-11-23
+Last Modified Date: 2026-04-03
 Description: 
-    - mmseq cluster modual
+    - MMseqs2 clustering module
 Dependencies: 
     - Python 3.9 or higher
     - pandas >= 1.3.0
@@ -69,7 +69,8 @@ def mmseqs2_clustering(
         merged_rdrp_fasta_path,  # Input: merged RDRP FASTA
         mmseqs_db_path           # Output: MMseqs2 database
     ]
-    subprocess.call(mmseqs_createdb_cmd)
+
+    subprocess.call(mmseqs_createdb_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     logging.info(f"MMseqs2 database created: {mmseqs_db_path}")
 
     # Step 3: Run MMseqs2 clustering
@@ -83,9 +84,10 @@ def mmseqs2_clustering(
         "-c", "0.333",            # Coverage threshold
         "-e", "0.1",              # E-value threshold
         "--cov-mode", "1",        # Coverage mode
-        "--cluster-mode", "2"     # Clustering mode
+        "--cluster-mode", "2",     # Clustering mode
+        "-v", "0"                  # Verbose output
     ]
-    subprocess.call(mmseqs_cluster_cmd)
+    subprocess.call(mmseqs_cluster_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     logging.info(f"MMseqs2 clustering completed: {mmseqs_cluster_db_path}")
 
     # Step 4: Generate clustering output in TSV format
@@ -97,17 +99,7 @@ def mmseqs2_clustering(
         mmseqs_cluster_db_path,   # Clustered database
         cluster_output_tsv        # Output TSV file
     ]
-    subprocess.run(mmseqs_createtsv_cmd, check=True)
+    subprocess.run(mmseqs_createtsv_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     logging.info(f"MMseqs2 clustering results saved to: {cluster_output_tsv}")
-
-    # Step 5 (optional): Parse the clustering result to identify known genes
-    # known_genes = set()
-    # with open(cluster_output_tsv, "r") as f:
-    #     for line in f:
-    #         query, target, *_ = line.strip().split("\t")
-    #         # If query and target are different, query is considered known
-    #         if query != target:
-    #             known_genes.add(query)
-    # logging.info(f"Number of known genes identified: {len(known_genes)}")
 
     return cluster_output_tsv

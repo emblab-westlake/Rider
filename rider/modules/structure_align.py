@@ -4,7 +4,7 @@ Script Name: structure_align.py
 Version: 1.0.0
 Author: Gaoyang Luo
 Created Date: 2024-11-20
-Last Modified Date: 2024-11-23
+Last Modified Date: 2026-04-03
 Description: 
     - predict rdrp protein structure
 Notes:
@@ -49,6 +49,7 @@ class Structure_aligned:
             tmp_dir,                      # Temporary directory
             "--alignment-type", str(self.alignment_type),  # Alignment type parameter
             "--threads", str(self.threads_use), # cpu threads
+            "-v", "0",                   # Verbose output
             "--format-output", "query,target,fident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,lddt,ttmscore,bits,qtmscore"
         ]
 
@@ -59,7 +60,7 @@ class Structure_aligned:
 
         # Execute Foldseek command
         try:
-            subprocess.run(foldseek_cmd, check=True)
+            subprocess.run(foldseek_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e:
             logging.error(f"Foldseek command failed: {e}")
             return None
@@ -91,7 +92,9 @@ class Structure_aligned:
 
                     # Construct candidate_pdb directory path
                     candidate_pdb_dir = os.path.join(intermidiate_dir, f"candidate_{self.sequence_length}_pdb")
-                    print(f"candidate_pdb_dir: {candidate_pdb_dir}")
+                    
+                    logging.info(f"candidate_pdb_dir: {candidate_pdb_dir}")
+                    
                     if not os.path.exists(candidate_pdb_dir):
                         logging.warning(f"Skipping as candidate_pdb directory does not exist: {candidate_pdb_dir}")
                         continue

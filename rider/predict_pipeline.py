@@ -32,6 +32,9 @@ from datasets import Dataset
 from typing import Dict, List
 import argparse
 import logging
+from tqdm import tqdm
+import threading
+import subprocess
 from rider.utils.download import ensure_data_exists
 from rider.modules.predict_structure_package import load_structure_model, process_faa_files
 from rider.modules.mmcluster import mmseqs2_clustering  
@@ -559,6 +562,35 @@ def save_predicted_genes(
     logging.info(f"{input_faa} done.")
     elapsed_time = time.time() - start_time
     logging.info(f"Saving predicted genes completed in {elapsed_time:.2f} seconds.")
+
+def run_with_progress(func, description, *args, **kwargs):
+    """ tqdm """
+    result = [None]
+    exception = [None]
+    is_done = threading.Event()
+
+    def worker():
+        try:
+            result[0] = func(*args, **kwargs)
+        except Exception as e:
+            exception[0] = e
+        finally:
+            is_done.set()
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+
+    # use tqdm  to show progress while waiting for the thread to finish
+    with tqdm(desc=description, unit="s") as pbar:
+        while not is_done.is_set():
+            time.sleep(0.1)
+            pbar.update(0.1)
+
+    if exception[0] is not None:
+        raise exception[0]
+    
+    return result[0]
+
 def main():
     # Get the path of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -758,7 +790,15 @@ def main():
         logging.info("Step 4 skipped: Clustering results already exist.")
     else:
         logging.info("Step 4: Clustering...")
-        cluster_output_tsv = mmseqs2_clustering(
+        # cluster_output_tsv = mmseqs2_clustering(
+        #     known_rdrp_fasta_path=known_rdrp,
+        #     predicted_rdrp_fasta_path=predicted_rdrp_fasta_path,
+        #     tmp_dir=tmp_dir,
+        #     file_name="rdrp_clustering"
+        # )
+        cluster_output_tsv = run_with_progress(
+            mmseqs2_clustering,
+            "Running MMseqs2 Clustering",  # 进度条显示的文字
             known_rdrp_fasta_path=known_rdrp,
             predicted_rdrp_fasta_path=predicted_rdrp_fasta_path,
             tmp_dir=tmp_dir,
@@ -797,8 +837,12 @@ def main():
             sequence_length=args.sequence_length,
             threads_use=args.threads
         )
-        foldseek_runner.foldseek_batch()
-        logging.info("Foldseek alignment completed.")
+        # foldseek_runner.foldseek_batch()
+        # logging.info("Foldseek alignment completed.")
+        run_with_progress(
+            foldseek_runner.foldseek_batch,
+            "Running Foldseek Alignment"  # 进度条显示的文字
+        )
     else:
         logging.info("Foldseek alignment is disabled.")
     logging.info(f"Step 6 completed in {time.time() - step_start_time:.2f} seconds.")
@@ -820,17 +864,6 @@ def main():
         logging.info("Structure prediction is disabled; filtering queries is skipped.")
     logging.info(f"Step 7 completed in {time.time() - step_start_time:.2f} seconds.")
 
-    # # Step 8: Extract final candidate sequences
-    # step_start_time = time.time()
-    # if args.predict_structure:
-    #     logging.info("Step 8: Extracting sequences for final candidates...")
-    #     process_final_result(args.output_dir, sample_name=file_name)
-    #     logging.info("Sequence extraction completed.")
-    # else:
-    #     logging.info("Sequence extraction is disabled.")
-    # logging.info(f"Step 8 completed in {time.time() - step_start_time:.2f} seconds.")
-        
-    # Final execution time
     elapsed_time = time.time() - overall_start_time
     logging.info(f"Total execution time: {elapsed_time:.2f} seconds.")
 

@@ -163,7 +163,7 @@ for i in "$INPUT_DIR"/test_AJ004930_1.faa; do
         --structure_align_enabled \
         --rdrp_structure_database "$RDRP_DB" \
         --prob_threshold 50 \
-        --threshold_type 1 \
+        --threshold_type 4 \
         --top_n_mean_prob 5 \
         --alignment-type 1 \
         --threshold 0.9
@@ -225,6 +225,56 @@ Filtering type: 1=bits, 2=ttmscore, 3=qtmscore, 4=max(ttmscore, qtmscore). For t
 - `--top_n_mean_prob` (int, default=1)
 Number of top hits to average when computing homology probability. Higher values make validation stricter.
 
+## 📓 Interactive Tutorial
+
+Want a more hands-on, step-by-step guide? We provide an interactive Jupyter Notebook that walks you through the entire Rider pipeline, from setting up the environment to running predictions and visualizing the output tables.
+
+👉 **[Check out the Interactive Tutorial (tutorial.ipynb)](tutorial.ipynb)**
+
+In this notebook, you will learn how to:
+- Run the `rider-predict` command step-by-step.
+- Understand the logic behind parameter tuning (especially structural alignment thresholds like `--threshold_type`).
+- Load and inspect the output files (`final_result_taxonomy_id.txt` and `final_result_taxonomy_id_with_seq.txt`) using `pandas`.
+
+## 📊 Output Format
+
+After a successful run, Rider generates several files in the specified output directory. The most important results are summarized in two tab-separated text files.
+
+### 1. Basic Taxonomy Results (`final_result_taxonomy_id.txt`)
+This file contains all alignments that met the initial probability threshold.
+
+| Query_ID | Target_ID | Bits_Score | qTM_score | tTM_score | LDDT | E_value |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| AJ004930.1_2_1;1-90 | Rv4_040347 | 74 | 0.7991 | 0.1936 | 0.78 | 0.483 |
+| AJ004930.1_3_1;1-95 | Rv4_142573 | 86 | 0.8984 | 0.2294 | 0.85 | 0.529 |
+| lcl\|AJ004930.1_prot_CAA06228.1_1_1;1-718 | Rv4_159529 | 48 | 0.4855 | 0.8688 | 0.61 | 0.658 |
+
+**Column Explanations:**
+*   **Query_ID**: The ID of your input sequence (with the `Rider_` prefix removed).
+*   **Target_ID**: The matched target sequence ID in the Rider structure database.
+*   **Bits_Score**: Foldseek structural alignment bit score (higher is better).
+*   **qTM_score**: TM-score normalized by the query length (range 0-1).
+*   **tTM_score**: TM-score normalized by the target length (range 0-1).
+*   **LDDT**: Local Distance Difference Test score, evaluating local structural accuracy.
+*   **E_value**: Expectation value of the alignment.
+
+---
+
+### 2. High-Quality Results with Sequences (`final_result_taxonomy_id_with_seq.txt`)
+This file is a strictly filtered subset of the basic results, applying dual-filtering logic based on sequence length and alignment score to ensure high reliability. It also appends the actual amino acid sequences.
+
+| Cleaned_Query_ID | Target_ID | Bits_Score | qTM_score | tTM_score | LDDT | E_value | qstart | qend | start_pos | end_pos | Sequence |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| AJ004930.1_2 | Rv4_040347 | 74 | 0.7991 | 0.1936 | 0.78 | 0.483 | 1 | 90 | 1 | 90 | MDGTFNQQAPLNRLVQLYQDGLLHDVEFYS... |
+| AJ004930.1_3 | Rv4_142573 | 86 | 0.8984 | 0.2294 | 0.85 | 0.529 | 1 | 95 | 1 | 95 | MLALSHHVIVQIAAMRVGKLPFTNYALLGD... |
+| lcl\|AJ004930.1_prot... | Rv4_159529 | 48 | 0.4855 | 0.8688 | 0.61 | 0.658 | 29 | 514 | 1 | 718 | MKRLTLSQNKSNQLTNNDLSNVGYITKQLF... |
+
+**Additional Column Explanations:**
+*   **Cleaned_Query_ID**: The base ID of the query with coordinate suffixes removed.
+*   **qstart / qend**: The start and end positions of the query in the structural alignment.
+*   **start_pos / end_pos**: The parsed coordinates from the original ID string.
+*   **Sequence**: The full amino acid sequence extracted from the raw input. *(Note: Truncated in the table above for display purposes).*
+
 ## 🔗Cite us
 If you find this work useful in your research, please consider citing our paper:
 
@@ -247,53 +297,4 @@ If you find this work useful in your research, please consider citing our paper:
   publisher = {Cold Spring Harbor Laboratory}
 }
 ```
-
-<!-- ## 🔗 Merge Foldseek top-hits with taxonomy
-
-A helper script is provided to merge Foldseek m8 results (one-line-per-alignment format)
-with a taxonomy table. The script selects the top hit per query according to the `tm_score`
-and attaches taxonomy fields (matched by accession, with optional version suffix removed).
-
-Script path: `Rider/utils/rider_merge_taxonomy.py`
-
-Usage:
-```bash
-python /root/gaoyang/westlake_emblab/Rider/utils/rider_merge_taxonomy.py \
-    --m8_file /path/to/foldseek_results.m8 \
-    --taxo_file /path/to/taxonomy.tsv \
-    --output_file /path/to/output_top_hit_taxonomy.tsv
-```
-
-Arguments:
-
-- --m8_file : Path to the Foldseek .m8 file (tab-separated, columns: query, target, identity, aln_len, matches, mismatches, q_start, q_end, t_start, t_end, evalue, tm_score).
-- --taxo_file : Path to a taxonomy TSV file that must contain an Accession column.
-- --output_file : Path to write the merged output (TSV).
-
-What the script does:
-
-1. Reads the m8 file and converts the tm_score column to numeric.
-2. Picks the top hit per query by descending tm_score.
-3. Removes version suffix from target (e.g. .1) before matching to accession.
-4. Reads the taxonomy file, expects an Accession column, and deduplicates by Accession.
-5. Left-joins the top hits with taxonomy fields using cleaned target -> Accession.
-6. Outputs a TSV with columns: query, target, plus all taxonomy columns except Accession.
-
-Notes and tips:
-
-- The script will exit with an error if either input file is missing or if the taxonomy file lacks an Accession column.
-- If your m8 file or taxonomy file is large, ensure sufficient memory is available. Consider pre-filtering if necessary.
-- The script strips a trailing dot followed by digits from the target accession (regex: \.\d+$). Modify the regex in the script if your accession format differs.
-- To make the script executable and run it directly:
-```bash
-chmod +x /Rider/utils/rider_merge_taxonomy.py
-/root/gaoyang/westlake_emblab/Rider/utils/rider_merge_taxonomy.py --m8_file ... --taxo_file ... --output_file ...
-```
-Example:
-```bash
-python Rider/utils/rider_merge_taxonomy.py \
---m8_file /usr/commondata/public/gaoyang/foldseek_search_dir/rider_gt200_all_mapping_aln.m8 \
---taxo_file Rider/utils/taxo_Rider_train_dat_parsed_taxonomy.tsv \
---output_file /foldseek_search_dir/foldseek_top_hit_taxonomy_lucaprot_gt200_all_mapping_aln.tsv
-``` -->
 
