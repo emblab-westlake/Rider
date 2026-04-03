@@ -46,7 +46,7 @@ for i in "$INPUT_DIR"/test_AJ004930_1.faa; do
         --structure_align_enabled \
         --rdrp_structure_database "$RDRP_DB" \
         --prob_threshold 50 \
-        --threshold_type 1 \
+        --threshold_type 4 \
         --top_n_mean_prob 5 \
         --alignment-type 1 \
         --threshold 0.9
