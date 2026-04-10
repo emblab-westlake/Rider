@@ -217,6 +217,7 @@ cronavirus
 long_seq*
 test.faa
 test_long_results
+test_data_tmp
 
 #checkpoint
 delete

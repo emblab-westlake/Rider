@@ -118,6 +118,52 @@ Alternatively, pass a custom path using:
 ```
 Note: Foldseek and mmseqs2 are external binaries. Rider attempts to add submodule/foldseek/bin to PATH, but mmseqs2 usually needs separate installation (e.g., conda: `conda install -c bioconda mmseqs2`). Verify with `which mmseqs` and `mmseqs --version`.
 
+## 🗄️ Training and Benchmark Data
+The comprehensive datasets used for training the Rider model and benchmarking its performance against other tools (e.g., LucaProt, PalmScan) will be made publicly available upon the official publication of the manuscript.
+
+Currently, the essential alignment databases (RSDB, RDSDB, RDSDB30) and dependency submodules required for running Rider are available on Zenodo:
+
+👉 **[Rider_Dependent_Databases_v1.1] (DOI: 10.5281/zenodo.19247869)** 
+
+### 🏋️ Model Training
+If you wish to retrain the Rider sequence classification model or generate training embeddings from your own custom datasets, we provide the necessary scripts in the src/train_data_generate/ directory.
+
+#### 1. Training Data Generation
+The training data generation is split into two main steps:
+
+1. Tokenization (step1_tokenize_fasta_to_pt.py): Converts raw .fasta protein sequences into tokenized PyTorch tensors (.pt) using the ESM2 tokenizer.
+2. Embedding Extraction & Dataset Building (step2_build_train_embedding.py): Passes the tokenized sequences through the ESM2 model to extract embeddings and splits them into training and validation sets. It supports both normal and hard_negative sampling modes (incorporating extra negative samples like proteases, capsids, and helicases).
+#### How to Run
+You can easily execute the entire data generation pipeline using the provided run.sh script. Make sure your raw FASTA files are placed in the correct directory (e.g., train_test_set/) before running.
+```sh
+cd src/train_data_generate/
+
+# Make the script executable
+chmod +x run.sh
+
+# Run the pipeline
+./run.sh
+```
+
+#### 2. Training the Rider Model
+Once the training embeddings (.pt files) are generated and saved in the training_data/ directory, you can train the core Rider classifier (a Transformer-based architecture).
+
+Run the training script:
+```sh
+# Set the visible GPU and start training
+CUDA_VISIBLE_DEVICES=0 python src/training/train_rider.py
+```
+
+#### 3. Baseline Models
+To facilitate comparison and benchmarking, we also provide training scripts for several baseline models in the src/training/ directory. These can be run similarly to the main Rider model:
+
+- CNN: python src/training/train_cnn.py
+- ESM-MLP: python src/training/train_esm_mlp.py
+- Random Forest (RF): python src/training/train_rf.py
+- Transformer (Standard): python src/training/- train_transformer.py
+- XGBoost: python src/training/train_xgb.py
+
+
 ## 🧪 Quick run example
 You can run the pipeline using the provided shell script `Rider/run_rider_predict.sh`:
 
