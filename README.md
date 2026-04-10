@@ -123,7 +123,7 @@ The comprehensive datasets used for training the Rider model and benchmarking it
 
 Currently, the essential alignment databases (RSDB, RDSDB, RDSDB30) and dependency submodules required for running Rider are available on Zenodo:
 
-👉 **[Rider_Dependent_Databases_v1.1] (DOI: 10.5281/zenodo.19247869)** 
+👉 **[Rider_Dependent_Databases_v1.1](https://doi.org/10.5281/zenodo.19247869)** 
 
 ### 🏋️ Model Training
 If you wish to retrain the Rider sequence classification model or generate training embeddings from your own custom datasets, we provide the necessary scripts in the src/train_data_generate/ directory.
