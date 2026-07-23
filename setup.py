@@ -58,6 +58,7 @@ setup(
     entry_points={
         "console_scripts": [
             "rider = rider.cli:main",
+            "rider-predict = rider.predict_pipeline:main",
         ]
     },
     classifiers=[
