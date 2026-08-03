@@ -35,7 +35,6 @@ import logging
 from tqdm import tqdm
 import threading
 import subprocess
-from rider.utils.download import ensure_data_exists
 from rider.modules.predict_structure_package import load_structure_model, process_faa_files
 from rider.modules.mmcluster import mmseqs2_clustering  
 from rider.modules.classification import classify_genes
@@ -54,10 +53,15 @@ project_root = os.path.dirname(script_dir)
 default_negative_sample_path = os.path.join(script_dir, "databases", "false256.faa")
 # Set default submodule & database paths
 USER_DATA_DIR = os.path.expanduser("~/.rider_data")
-# Set default path for submodule 
-default_submodule_path = os.path.join(USER_DATA_DIR, "submodule")
+default_resource_root = (
+    project_root
+    if os.path.isfile(os.path.join(project_root, "setup.py"))
+    else USER_DATA_DIR
+)
+# Set default path for submodule
+default_submodule_path = os.path.join(default_resource_root, "submodule")
 # Set default path for the Foldseek RDRP structure database
-default_rdrp_db_path = os.path.join(USER_DATA_DIR, "Rider_pdb_database", "database")
+default_rdrp_db_path = os.path.join(default_resource_root, "Rider_RDSDB30", "pdbs")
 # Set default path for weight
 default_weight_path=os.path.join(project_root, "checkpoint", "checkpoint-19600","model.safetensors") #Rider/checkpoint/checkpoint-102000/model.safetensors
 
@@ -113,14 +117,11 @@ def parse_args():
 
     
     if not os.path.exists(args.submodule_dir):
-        print(f"⚠️ Submodule not found at {args.submodule_dir}")
-        print("⏳ Attempting to download submodule...")
-        ensure_data_exists(download_submodule=True)
-
-    if args.structure_align_enabled and not os.path.exists(args.rdrp_structure_database):
-        print(f"⚠️ Foldseek database not found at {args.rdrp_structure_database}")
-        print("⏳ Attempting to download database...")
-        ensure_data_exists(download_db=True)
+        parser.error(
+            f"Rider submodule not found at {args.submodule_dir}. "
+            "From a Rider checkout, run `rider download-db submodule`, "
+            "or specify an existing path with --submodule_dir."
+        )
     return args
 
 # model

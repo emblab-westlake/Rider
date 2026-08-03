@@ -25,6 +25,7 @@ setup(
     license="MIT",
     packages=find_packages(exclude=("tests", "docs")),
     include_package_data=True,
+    package_data={"rider": ["databases/*.faa"]},
     python_requires=">=3.10",
     install_requires=[
         "absl-py>=2.1.0",

@@ -176,6 +176,7 @@ wandb
 
 #database
 figure
+.rider_downloads/
 
 #files
 
@@ -241,4 +242,3 @@ docs/data
 checkpoint-6000
 checkpoint-9600
 Rider_RDSDB_30
-

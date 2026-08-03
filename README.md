@@ -1,7 +1,7 @@
 # 🧬 Rider
 
-**Rider** enables fast identification of known and novel RNA viruses from large volumes of metatranscriptomic sequencing data.  
-It integrates sequence classification, structure predictcion, and structure alignment into a streamlined pipeline.
+**Rider** enables fast identification of RNA viruses from large volumes of metatranscriptomic sequencing data.
+It integrates sequence classification, structure prediction, and structure alignment into a streamlined pipeline.
 
 We are keeping updating this project...
 
@@ -37,7 +37,7 @@ pip install -e .
 ```
 Notes:
 
-- `env.yaml` installs system/bio tools (mmseqs2, diamond, blast, hmmer, prodigal, entrez-direct) from conda-forge / bioconda so they are available on PATH.
+- `env.yaml` installs system/bio tools (mmseqs2, diamond, blast, hmmer, prodigal, entrez-direct) from conda-forge / bioconda so they are available on PATH. Foldseek is supplied by the downloadable Rider submodule.
 - `requirements.txt` lists many heavy GPU and system packages (torch, triton, deepspeed). Installing them via pip in some systems may fail or produce suboptimal GPU behavior — see the alternative installation below for a safer approach.
 
 **B. Manual Conda Setup (GPU/CPU control; safer for end users; preferred for running pipelines)**
@@ -86,29 +86,41 @@ Then test Rider CLI (after pip install -e .):
 rider-predict -h
 ```
 
-## 📁  Step 2. Download and prepare the Rider Dependency
+## 📁 Step 2. Download and prepare Rider dependencies
 ### 📦 Dependency
 Rider depends on the following:
 
 - ESM2 (sequence embeddings)
 - ESMFold (structure prediction)
 - Foldseek (structure alignment)
-- Rider structure database (RNA viral protein strucutre reference) (comming soon...)
+- Rider structure database (RNA viral protein structure reference)
 
 This database is required for structural alignment using Foldseek (step 6/7).
 
 📥 How to prepare:
-1. Download the prebuilt dependencies and database manually (Zenodo: https://doi.org/10.5281/zenodo.19247869) or follow your internal distribution process. We are keep updating.
-2. Place it under the Rider folder like this:
+
+The versioned resources are hosted on [Zenodo](https://doi.org/10.5281/zenodo.19247869). From the root of a cloned Rider repository, list the available resources and install the required archives with:
+
+```sh
+cd Rider
+rider download-db --list
+
+# Install the model/Foldseek submodule and the recommended compact database
+rider download-db submodule rdsdb30
+```
+
+The command downloads resumable archives into `Rider/.rider_downloads/`, verifies their Zenodo MD5 checksums, retains the archives, and extracts them directly under the Rider root. Resource selection is explicit because the complete collection is approximately 23 GB compressed. Use `--download-only` to verify and retain archives without extraction, or `--rider-root /path/to/Rider` when running the command outside the repository.
+
+The same archives can alternatively be downloaded manually from Zenodo and extracted under the Rider root.
 
 ✅ Required layout:
 ```sh
 Rider/
-└── Submodule/
+└── submodule/
     └── esmfold_v1/  
     └── esm2_t12_35M_UR50D
     └── foldseek 
-└── RDSDB/ #Rider RdRp-domain-specific Database
+└── Rider_RDSDB30/ # recommended non-redundant RdRp database
     └── pdbs/ 
 ```
 
@@ -134,15 +146,16 @@ The training data generation is split into two main steps:
 1. Tokenization (step1_tokenize_fasta_to_pt.py): Converts raw .fasta protein sequences into tokenized PyTorch tensors (.pt) using the ESM2 tokenizer.
 2. Embedding Extraction & Dataset Building (step2_build_train_embedding.py): Passes the tokenized sequences through the ESM2 model to extract embeddings and splits them into training and validation sets. It supports both normal and hard_negative sampling modes (incorporating extra negative samples like proteases, capsids, and helicases).
 #### How to Run
-You can easily execute the entire data generation pipeline using the provided run.sh script. Make sure your raw FASTA files are placed in the correct directory (e.g., train_test_set/) before running.
+You can execute the data generation pipeline using the provided `run.sh` script. By default, it reads FASTA files from `src/train_data_generate/train_test_set/`, uses the bundled ESM2 model under `submodule/`, and writes results to `src/train_data_generate/training_data/`. Override `RAW_DIR`, `OUTPUT_DIR`, `ESM_PATH`, or `DEVICE` when your files are elsewhere.
 ```sh
-cd src/train_data_generate/
+# Run with the default repository paths
+bash src/train_data_generate/run.sh
 
-# Make the script executable
-chmod +x run.sh
-
-# Run the pipeline
-./run.sh
+# Example with custom data and GPU
+RAW_DIR=/path/to/train_test_set \
+OUTPUT_DIR=/path/to/training_data \
+DEVICE=cuda:0 \
+bash src/train_data_generate/run.sh
 ```
 
 #### 2. Training the Rider Model
@@ -160,8 +173,39 @@ To facilitate comparison and benchmarking, we also provide training scripts for 
 - CNN: python src/training/train_cnn.py
 - ESM-MLP: python src/training/train_esm_mlp.py
 - Random Forest (RF): python src/training/train_rf.py
-- Transformer (Standard): python src/training/- train_transformer.py
+- Transformer (Standard): python src/training/train_transformer.py
 - XGBoost: python src/training/train_xgb.py
+
+Baseline evaluation scripts are located in `src/baseline/`. For the frozen-ESM2
+linear classifier, a checkpoint is required by default and loading errors stop
+the run instead of silently using random weights:
+
+```sh
+bash src/baseline/run_scripts/run_esm_mlp.sh \
+  /path/to/ESM2_35M_embeddings \
+  /path/to/results \
+  /path/to/model.safetensors
+```
+
+To generate an explicitly labeled, fixed-seed untrained negative control:
+
+```sh
+SEED=42 bash src/baseline/run_scripts/run_esm_mlp.sh \
+  /path/to/ESM2_35M_embeddings \
+  /path/to/results \
+  --untrained-control
+```
+
+#### 4. Benchmark Dataset Construction
+
+The benchmark builders are retained under `src/benchmark_build/`. Run them from
+the directory containing the input FASTA files. The hard-negative wrapper now
+calls the corresponding hard-negative Python builder:
+
+```sh
+bash /path/to/Rider/src/benchmark_build/run_Benchmark_construct_unparied_test_set.sh
+bash /path/to/Rider/src/benchmark_build/run_Benchmark_construct_tough_unparied_test_set.sh
+```
 
 
 ## 🧪 Quick run example
@@ -176,7 +220,7 @@ SCRIPT_PATH=$(dirname $(readlink -f "$0"))
 INPUT_DIR="$SCRIPT_PATH/test_data"                          # input dir
 OUTPUT_PATH="$SCRIPT_PATH/test_data/test_results"           # output dir
 WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-19600/model.safetensors"
-RDRP_DB="$SCRIPT_PATH/RDSDB/pdbs" #change this to your own path
+RDRP_DB="$SCRIPT_PATH/Rider_RDSDB30/pdbs" # change this to your own path
 SUBMODULE_DIR="$SCRIPT_PATH/submodule"
 
 # Debug output
@@ -259,7 +303,7 @@ Enable Foldseek structural alignment (requires Foldseek binary and Rider PDB dat
 - `--rdrp_structure_database` (str)
 Path to Foldseek database directory. Required if --structure_align_enabled is set.
 
-- `--alignment-typ`e (int, default=1)
+- `--alignment-type` (int, default=1)
 Foldseek alignment type parameter (passed to the alignment runner).
 
 - `--prob_threshold` (int, default=50)
@@ -343,4 +387,3 @@ If you find this work useful in your research, please consider citing our paper:
   publisher = {Cold Spring Harbor Laboratory}
 }
 ```
-

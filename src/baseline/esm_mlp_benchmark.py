@@ -1,13 +1,17 @@
 """
 Script Name: esm_mlp_benchmark.py
-Description: Evaluate SimpleLinearModel (MLP) on ESM embeddings.
+Description: Evaluate a linear classification head on frozen ESM2 embeddings.
              Save comprehensive data for later plotting of confusion matrices and ROC curves.
 """
 
 import os
+import argparse
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from safetensors.torch import load_file
 from sklearn.metrics import (
     accuracy_score, 
     precision_score, 
@@ -20,8 +24,6 @@ from sklearn.metrics import (
     precision_recall_curve,
     roc_curve
 )
-import argparse
-import numpy as np
 
 # Default path configuration
 DEFAULT_EMBEDDINGS_PATH = ""
@@ -83,64 +85,92 @@ def find_optimal_threshold(y_true, y_scores):
     return best_threshold, best_f1
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Benchmark MLP Classifier.")
+    parser = argparse.ArgumentParser(description="Benchmark a linear classifier on frozen ESM2 embeddings.")
     parser.add_argument("--embeddings_pt", type=str, default=DEFAULT_EMBEDDINGS_PATH, help="Path to the generated embeddings .pt file.")
     parser.add_argument("--weights", type=str, default=DEFAULT_WEIGHTS_PATH, help="Path to model weights (.pt or .safetensors).")
+    parser.add_argument(
+        "--untrained-control",
+        action="store_true",
+        help="Use a fixed-seed, randomly initialized head as ESM2-untrained. Cannot be combined with --weights.",
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed used for the untrained control.")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--save_path", type=str, default="evaluation_results_ESM_mlp_2.npz", help="Path to save plotting data.")
     return parser.parse_args()
 
 def load_classifier_weights(model, weight_path):
+    if not weight_path:
+        raise ValueError("--weights is required unless --untrained-control is specified.")
     if not os.path.exists(weight_path):
-        print(f"Warning: Weights not found at {weight_path}. Initializing with random weights (for testing only).")
-        return model
+        raise FileNotFoundError(f"Weights not found at {weight_path}")
     
     print(f"Loading weights from {weight_path}...")
-    try:
+    if weight_path.endswith(".safetensors"):
+        state_dict = load_file(weight_path, device="cpu")
+    else:
         state_dict = torch.load(weight_path, map_location='cpu')
         
-        if isinstance(state_dict, dict) and 'model_state_dict' in state_dict:
-            state_dict = state_dict['model_state_dict']
-        elif isinstance(state_dict, dict) and 'state_dict' in state_dict:
-            state_dict = state_dict['state_dict']
-            
-        new_state_dict = {}
-        for k, v in state_dict.items():
-            if k.startswith("module."):
-                new_state_dict[k[7:]] = v
-            else:
-                new_state_dict[k] = v
-                
-        model.load_state_dict(new_state_dict, strict=False)
-        print("Weights loaded successfully.")
-    except Exception as e:
-        print(f"Error loading weights: {e}")
+    if isinstance(state_dict, dict) and 'model_state_dict' in state_dict:
+        state_dict = state_dict['model_state_dict']
+    elif isinstance(state_dict, dict) and 'state_dict' in state_dict:
+        state_dict = state_dict['state_dict']
+
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        for prefix in ("module.", "model."):
+            if key.startswith(prefix):
+                key = key[len(prefix):]
+        new_state_dict[key] = value
+
+    # Training checkpoints may store the loss-weight buffer. It is not needed
+    # for inference, but all trainable classifier parameters must match.
+    if model.class_weights is None:
+        new_state_dict.pop("class_weights", None)
+
+    incompatible = model.load_state_dict(new_state_dict, strict=False)
+    if incompatible.missing_keys or incompatible.unexpected_keys:
+        raise RuntimeError(
+            "Checkpoint does not match SimpleLinearModel: "
+            f"missing={incompatible.missing_keys}, "
+            f"unexpected={incompatible.unexpected_keys}"
+        )
+
+    print("Weights loaded successfully.")
         
     return model
 
 def main():
     args = parse_args()
+
+    if args.untrained_control and args.weights:
+        raise ValueError("--untrained-control cannot be combined with --weights.")
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
     
     # Load data
     print(f"Loading test data from {args.embeddings_pt}...")
-    try:
-        data = torch.load(args.embeddings_pt)
-        embeddings = data["embeddings"].to(args.device) 
-        labels_tensor = data["labels"].to(args.device)
-        labels_numpy = data["labels"].numpy()
-    except Exception as e:
-        print(f"Error loading data: {e}")
-        return
+    data = torch.load(args.embeddings_pt)
+    embeddings = data["embeddings"].to(args.device)
+    labels_tensor = data["labels"].to(args.device)
+    labels_numpy = data["labels"].numpy()
     
     print(f"Test set size: {len(labels_numpy)}")
     print(f"Embedding shape: {embeddings.shape}")
 
     # Initialize model
     input_dim = embeddings.shape[-1]
-    print(f"Initializing MLP with input_dim={input_dim}...")
+    print(f"Initializing linear head with input_dim={input_dim}...")
     
     model = SimpleLinearModel(input_dim=input_dim, output_dim=2).to(args.device)
-    model = load_classifier_weights(model, args.weights)
+    if args.untrained_control:
+        model_mode = "ESM2-untrained"
+        weights_path = ""
+        print(f"Using {model_mode} with fixed random seed {args.seed}; no checkpoint will be loaded.")
+    else:
+        model_mode = "ESM2-linear"
+        weights_path = os.path.abspath(args.weights)
+        model = load_classifier_weights(model, args.weights)
     model.eval()
 
     # Inference
@@ -233,9 +263,13 @@ def main():
     fpr, tpr, _ = roc_curve(y_true, y_prob_pos)
     
     print(f"Saving results to {args.save_path}...")
+    os.makedirs(os.path.dirname(os.path.abspath(args.save_path)), exist_ok=True)
     
     np.savez(
         args.save_path,
+        model_mode=model_mode,
+        weights_path=weights_path,
+        seed=args.seed,
         y_true=y_true,
         y_prob=y_prob_pos,
         y_pred_default=y_pred_default,
