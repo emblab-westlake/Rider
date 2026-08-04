@@ -596,8 +596,10 @@ def main():
     # Get the path of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
+    args = parse_args()
+
     # Set the absolute path to foldseek_dir
-    foldseek_dir = os.path.join(project_root, "submodule", "foldseek", "bin")
+    foldseek_dir = os.path.join(args.submodule_dir, "foldseek", "bin")
     
     # Dynamically update the PATH environment variable
     os.environ["PATH"] = f"{foldseek_dir}:{os.environ.get('PATH', '')}"
@@ -605,7 +607,6 @@ def main():
     # Optional: verify that PATH was updated successfully
     print(f"Updated PATH: {os.environ['PATH']}")
     
-    args = parse_args()
     start_time = time.time()
     overall_start_time = start_time  # Record the start time of the entire script
     
@@ -619,8 +620,8 @@ def main():
     predicted_rdrp_fasta_path = os.path.join(tmp_dir, f"{file_name}_Rider_predicted_RNA_Virus_potential_candidates.faa")
     
     # Model paths
-    esmfold_dir=os.path.join(project_root,"submodule", "esmfold_v1")
-    esmt12_dir=os.path.join(project_root,"submodule", "esm2_t12_35M_UR50D")
+    esmfold_dir=os.path.join(args.submodule_dir, "esmfold_v1")
+    esmt12_dir=os.path.join(args.submodule_dir, "esm2_t12_35M_UR50D")
     known_rdrp = os.path.join(script_dir, "databases", "ICTV_RNA_Virus_21.faa")
 
     # Output file paths
