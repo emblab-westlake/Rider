@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use Rider in your research, please cite this software."
+title: "Rider: an RNA virus identification pipeline"
+type: software
+version: 1.0.0
+license: MIT
+authors:
+  - family-names: Luo
+    given-names: Gaoyang
+    email: lgyjsnjhit@gmail.com
+repository-code: "https://github.com/emblab-westlake/Rider"
+url: "https://github.com/emblab-westlake/Rider"
+abstract: >-
+  Rider is a computational pipeline for identifying RNA virus candidates
+  from protein sequences using sequence classification and optional
+  structure-based validation.
+keywords:
+  - RNA virus
+  - RNA-dependent RNA polymerase
+  - RdRp
+  - protein language model
+  - bioinformatics
