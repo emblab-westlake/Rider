@@ -224,6 +224,13 @@ test_data_tmp
 delete
 tmp/
 
+# Hugging Face Trainer recovery state (inference only needs model.safetensors)
+checkpoint/**/optimizer.pt
+checkpoint/**/scheduler.pt
+checkpoint/**/rng_state*.pth
+checkpoint/**/trainer_state.json
+checkpoint/**/training_args.bin
+
 #doc or data
 NCBI_all_length_rdrp_contained.faa
 ICTV_RNA_Virus_7346_rdrp_contained.faa
