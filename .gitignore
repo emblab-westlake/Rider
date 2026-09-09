@@ -220,6 +220,9 @@ test.faa
 test_long_results
 test_data_tmp
 
+# Local maintenance tests (not included in the GitHub release)
+/tests/
+
 #checkpoint
 delete
 tmp/

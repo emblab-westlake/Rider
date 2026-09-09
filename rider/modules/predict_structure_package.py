@@ -64,11 +64,6 @@ def generate_pdb(record, model, output_dir, sequence_length):
     sequence = str(record.seq)[:sequence_length]
     # print(f"Processing {sequence_id}, truncated sequence length: {len(sequence)}")
 
-    # Check for invalid character 'X' or 'x' in the sequence
-    if 'x' in sequence.lower():
-        # print(f"Error processing {sequence_id}: Invalid character in the sequence: 'x'")
-        return None, 0
-
     start_time = time.time()
 
     try:

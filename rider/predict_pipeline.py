@@ -70,8 +70,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Protein sequence classification and structure prediction pipeline.")
     parser.add_argument("-i", "--input_faa", required=True, type=str, 
                         help="Path to the input FASTA file.")
-    parser.add_argument("-w", "--weights", required=True, type=str, default=default_weight_path,
-                        help="Path to the model weights.")
+    parser.add_argument("-w", "--weights", type=str, default=default_weight_path,
+                        help="Path to the model weights. Not used with --start_from_esmfold.")
     parser.add_argument("-b", "--batch_sizes", type=int, default=64, 
                         help="Batch size for processing.")
     parser.add_argument("-t", "--threads", type=str, default=32, 
@@ -82,6 +82,16 @@ def parse_args():
                         help="Protein sequence truncation length.")
     parser.add_argument("--predict_structure", action="store_true", 
                         help="Enable structure prediction.")
+    parser.add_argument(
+        "--start_from_esmfold",
+        "--start-from-esmfold",
+        action="store_true",
+        help=(
+            "Treat every input record as an existing Stage-One candidate, create the "
+            "usual candidate and split files, and resume at ESMFold. This skips "
+            "tokenization, feature extraction, classification, and RdRp clustering."
+        ),
+    )
     parser.add_argument("--structure_model_path", type=str, 
                         help="Path to the structure prediction model.")
     parser.add_argument("--threshold", type=float, default=0.9, 
@@ -108,6 +118,15 @@ def parse_args():
                         help="Usually the at least top 1 query above the homo prob threshold, you can choose 2 or more to obtain more strict results.")
     
     args = parser.parse_args()
+
+    if not os.path.isfile(args.input_faa):
+        parser.error(f"Input FASTA not found: {args.input_faa}")
+
+    if not args.start_from_esmfold and not os.path.isfile(args.weights):
+        parser.error(f"Rider model weights not found: {args.weights}")
+
+    if args.start_from_esmfold:
+        args.predict_structure = True
 
     # Validate that the database exists if structure alignment is enabled
     if args.structure_align_enabled:
@@ -564,6 +583,38 @@ def save_predicted_genes(
     elapsed_time = time.time() - start_time
     logging.info(f"Saving predicted genes completed in {elapsed_time:.2f} seconds.")
 
+
+def load_stage_one_candidates(input_faa: str):
+    """Load a candidate FASTA for ``--start_from_esmfold``.
+
+    The candidate file produced by Rider prefixes identifiers with ``Rider_``.
+    Remove exactly one such prefix so that the normal output writer can recreate
+    the same Stage-One file names and identifier convention without producing a
+    duplicate ``Rider_Rider_`` prefix.
+    """
+    sequence_store = {}
+    candidate_ids = []
+
+    for record in SeqIO.parse(input_faa, "fasta"):
+        sequence_id = str(record.id)
+        if sequence_id.startswith("Rider_"):
+            sequence_id = sequence_id[len("Rider_"):]
+        if not sequence_id:
+            raise ValueError("Encountered an empty FASTA identifier")
+        if sequence_id in sequence_store:
+            raise ValueError(f"Duplicate candidate identifier: {sequence_id}")
+
+        sequence = str(record.seq)
+        if not sequence.replace("*", "").strip():
+            raise ValueError(f"Candidate sequence is empty: {sequence_id}")
+        sequence_store[sequence_id] = sequence
+        candidate_ids.append(sequence_id)
+
+    if not candidate_ids:
+        raise ValueError(f"No FASTA records found in candidate input: {input_faa}")
+
+    return sequence_store, candidate_ids
+
 def run_with_progress(func, description, *args, **kwargs):
     """ tqdm """
     result = [None]
@@ -591,6 +642,67 @@ def run_with_progress(func, description, *args, **kwargs):
         raise exception[0]
     
     return result[0]
+
+
+def run_structure_stages(args, file_name, esmfold_dir, overall_start_time):
+    """Run the existing ESMFold, Foldseek, and result-filtering stages."""
+    # Step 5: Structure prediction (optional)
+    step_start_time = time.time()
+    if args.predict_structure:
+        logging.info("Step 5: Predicting structures...")
+        structure_model = load_structure_model(
+            model_path=args.structure_model_path or esmfold_dir,
+            gpu_id=1
+        )
+        process_faa_files(
+            input_dir=os.path.join(args.output_dir, file_name),
+            sequence_length=args.sequence_length,
+            model=structure_model,
+            max_workers=1
+        )
+        logging.info("Structure prediction completed.")
+    else:
+        logging.info("Structure prediction is disabled.")
+    logging.info(f"Step 5 completed in {time.time() - step_start_time:.2f} seconds.")
+
+    # Step 6: Structural alignment
+    step_start_time = time.time()
+    if args.structure_align_enabled:
+        logging.info("Step 6: Running Foldseek for structural alignment...")
+        foldseek_runner = Structure_aligned(
+            input_dir=args.output_dir,
+            database_dir=args.rdrp_structure_database,
+            alignment_type=args.alignment_type,
+            sequence_length=args.sequence_length,
+            threads_use=args.threads
+        )
+        run_with_progress(
+            foldseek_runner.foldseek_batch,
+            "Running Foldseek Alignment"
+        )
+    else:
+        logging.info("Foldseek alignment is disabled.")
+    logging.info(f"Step 6 completed in {time.time() - step_start_time:.2f} seconds.")
+
+    # Step 7 & 8: Filter queries based on Foldseek results & Extract final candidate sequences
+    step_start_time = time.time()
+    if args.predict_structure:
+        logging.info("Step 7: Filtering queries based on Foldseek results...")
+        process_fixed_prob_out_folders(
+            input_root_dir=args.output_dir,
+            alignment_type=args.alignment_type,
+            n=args.top_n_mean_prob,
+            prob_threshold=args.prob_threshold,
+            threshold_type=args.threshold_type
+        )
+        logging.info("Filtering completed.")
+        logging.info("Extraction final candidate completed.")
+    else:
+        logging.info("Structure prediction is disabled; filtering queries is skipped.")
+    logging.info(f"Step 7 completed in {time.time() - step_start_time:.2f} seconds.")
+
+    elapsed_time = time.time() - overall_start_time
+    logging.info(f"Total execution time: {elapsed_time:.2f} seconds.")
 
 def main():
     # Get the path of the current script
@@ -662,6 +774,27 @@ def main():
     # Log initialization
     logging.info(f"Logging to file: {log_file_path}")
     logging.info(f"Processing file: {args.input_faa}")
+
+    if args.start_from_esmfold:
+        logging.info(
+            "Direct ESMFold mode: treating every input record as a Stage-One candidate."
+        )
+        seq_store_pos, positive_ids = load_stage_one_candidates(args.input_faa)
+        save_predicted_genes(
+            output_dir=tmp_dir,
+            file_name=file_name,
+            seq_store_pos=seq_store_pos,
+            target_positive_record_id=positive_ids,
+            target_negative_record_id=[],
+            input_faa=args.input_faa,
+        )
+        logging.info(
+            "Prepared the standard Stage-One candidate files for %d input sequences; "
+            "Steps 1-4 are skipped.",
+            len(positive_ids),
+        )
+        run_structure_stages(args, file_name, esmfold_dir, overall_start_time)
+        return
 
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(esmt12_dir)
@@ -809,65 +942,7 @@ def main():
         logging.info(f"Clustering result saved at: {cluster_output_tsv}")
     logging.info(f"Step 4 completed in {time.time() - step_start_time:.2f} seconds.")
 
-    # Step 5: Structure prediction (optional)
-    step_start_time = time.time()
-    if args.predict_structure:
-        logging.info("Step 5: Predicting structures...")
-        structure_model = load_structure_model(
-            model_path=args.structure_model_path or esmfold_dir,
-            gpu_id=1
-        )
-        process_faa_files(
-            input_dir=os.path.join(args.output_dir, file_name),
-            sequence_length=args.sequence_length,
-            model=structure_model,
-            max_workers=1
-        )
-        logging.info("Structure prediction completed.")
-    else:
-        logging.info("Structure prediction is disabled.")
-    logging.info(f"Step 5 completed in {time.time() - step_start_time:.2f} seconds.")
-    
-    # Step 6: Structural alignment
-    step_start_time = time.time()
-    if args.structure_align_enabled:
-        logging.info("Step 6: Running Foldseek for structural alignment...")
-        foldseek_runner = Structure_aligned(
-            input_dir=args.output_dir,
-            database_dir=args.rdrp_structure_database,
-            alignment_type=args.alignment_type,
-            sequence_length=args.sequence_length,
-            threads_use=args.threads
-        )
-        # foldseek_runner.foldseek_batch()
-        # logging.info("Foldseek alignment completed.")
-        run_with_progress(
-            foldseek_runner.foldseek_batch,
-            "Running Foldseek Alignment"  # 进度条显示的文字
-        )
-    else:
-        logging.info("Foldseek alignment is disabled.")
-    logging.info(f"Step 6 completed in {time.time() - step_start_time:.2f} seconds.")
-
-    # Step 7 & 8: Filter queries based on Foldseek results & Extract final candidate sequences
-    step_start_time = time.time()
-    if args.predict_structure:
-        logging.info("Step 7: Filtering queries based on Foldseek results...")
-        process_fixed_prob_out_folders(
-            input_root_dir=args.output_dir,
-            alignment_type=args.alignment_type,
-            n=args.top_n_mean_prob,
-            prob_threshold=args.prob_threshold,
-            threshold_type=args.threshold_type
-        )
-        logging.info("Filtering completed.")
-        logging.info("Extraction final candidate completed.")
-    else:
-        logging.info("Structure prediction is disabled; filtering queries is skipped.")
-    logging.info(f"Step 7 completed in {time.time() - step_start_time:.2f} seconds.")
-
-    elapsed_time = time.time() - overall_start_time
-    logging.info(f"Total execution time: {elapsed_time:.2f} seconds.")
+    run_structure_stages(args, file_name, esmfold_dir, overall_start_time)
 
 if __name__ == "__main__":
     main()

@@ -220,7 +220,7 @@ SCRIPT_PATH=$(dirname $(readlink -f "$0"))
 INPUT_DIR="$SCRIPT_PATH/test_data"                          # input dir
 OUTPUT_PATH="$SCRIPT_PATH/test_data/test_results"           # output dir
 WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-19600/model.safetensors"
-RDRP_DB="$SCRIPT_PATH/Rider_RDSDB30/pdbs" # change this to your own path
+RDRP_DB="$SCRIPT_PATH/Rider_RDSDB/pdbs" # change this to your own path
 SUBMODULE_DIR="$SCRIPT_PATH/submodule"
 
 # Debug output
@@ -267,8 +267,8 @@ Arguments explained
 - `-i`, `--input_faa` (str, required)
 Path to input FASTA file. Each record should be one protein sequence.
 
-- `-w`, `--weights` (str, required)
-Path to the classification model weights (safetensors). Default in code: checkpoint/checkpoint-102000/model.safetensors.
+- `-w`, `--weights` (str, required for the standard Stage-One workflow)
+Path to the classification model weights (safetensors). It is not used when `--start_from_esmfold` is enabled.
 
 - `-b`, `--batch_sizes` (int, default=64)
 Batch size for tokenization / feature extraction. Adjust based on GPU memory (≤ 64 suggested for <16GB GPU).
@@ -314,6 +314,55 @@ Filtering type: 1=bits, 2=ttmscore, 3=qtmscore, 4=max(ttmscore, qtmscore). For t
 
 - `--top_n_mean_prob` (int, default=1)
 Number of top hits to average when computing homology probability. Higher values make validation stricter.
+
+### How to warm-start from the structure-validation stage
+
+Rider provides a structure-validation warm-start mode for sequences that have
+already been selected as candidates. Use the same command as in the full
+pipeline example above and add `--start_from_esmfold`:
+
+```sh
+# Activate the conda environment
+# source /opt/miniforge3/bin/activate rider
+
+SCRIPT_PATH=$(dirname $(readlink -f "$0"))
+INPUT_FAA="$SCRIPT_PATH/test_data/test_AJ004930_1.faa"
+OUTPUT_PATH="$SCRIPT_PATH/test_data/test_results"
+WEIGHTS="$SCRIPT_PATH/checkpoint/checkpoint-19600/model.safetensors"
+RDRP_DB="$SCRIPT_PATH/Rider_RDSDB/pdbs"
+SUBMODULE_DIR="$SCRIPT_PATH/submodule"
+
+CUDA_VISIBLE_DEVICES=1 \
+rider-predict \
+    -i "$INPUT_FAA" \
+    -t 32 \
+    -w "$WEIGHTS" \
+    -b 1 \
+    --device cuda \
+    -o "$OUTPUT_PATH" \
+    --threads 32 \
+    --submodule_dir "$SUBMODULE_DIR" \
+    --predict_structure \
+    --start_from_esmfold \
+    --sequence_length 1024 \
+    --structure_align_enabled \
+    --rdrp_structure_database "$RDRP_DB" \
+    --prob_threshold 50 \
+    --threshold_type 4 \
+    --top_n_mean_prob 5 \
+    --alignment-type 1 \
+    --threshold 0.9
+```
+
+In this mode, every input record is written into Rider's standard Stage-One
+candidate and result files. Rider then creates the usual 1,000-aa windows with
+a 500-aa overlap and continues through the existing ESMFold, Foldseek, and
+final filtering stages. Tokenization, feature extraction, classification, and
+known-RdRp MMseqs2 clustering are skipped. The `-w` argument is retained in
+the example only to mirror the standard command; the weights are not loaded in
+this mode. Both ordinary identifiers and `Rider_`-prefixed candidate
+identifiers are accepted, and residues represented by `X` are passed to
+ESMFold.
 
 ## 📓 Interactive Tutorial
 
