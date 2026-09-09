@@ -3,7 +3,10 @@
 **Rider** enables fast identification of RNA viruses from large volumes of metatranscriptomic sequencing data.
 It integrates sequence classification, structure prediction, and structure alignment into a streamlined pipeline.
 
-We are keeping updating this project...
+## 🔧 Key maintenance updates
+
+- **2026-09-09 — Structure validation:** Sequences containing unknown residues (`X`) are now retained and passed to ESMFold instead of being skipped.
+- **2026-09-09 — Structure warm start:** Added the `--start_from_esmfold` option. This mode treats all input sequences as Stage-One candidates, generates the standard candidate and sliding-window files, and continues through the existing ESMFold, Foldseek, and final filtering workflow.
 
 
 ## 🏗️ Architecture
