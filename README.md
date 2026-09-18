@@ -358,14 +358,7 @@ rider-predict \
 ```
 
 In this mode, every input record is written into Rider's standard Stage-One
-candidate and result files. Rider then creates the usual 1,000-aa windows with
-a 500-aa overlap and continues through the existing ESMFold, Foldseek, and
-final filtering stages. Tokenization, feature extraction, classification, and
-known-RdRp MMseqs2 clustering are skipped. The `-w` argument is retained in
-the example only to mirror the standard command; the weights are not loaded in
-this mode. Both ordinary identifiers and `Rider_`-prefixed candidate
-identifiers are accepted, and residues represented by `X` are passed to
-ESMFold.
+candidate and result files.
 
 ## 📓 Interactive Tutorial
 
@@ -420,22 +413,21 @@ This file is a strictly filtered subset of the basic results, applying dual-filt
 ## 🔗Cite us
 If you find this work useful in your research, please consider citing our paper:
 
-> **Expanding the RNA Virus Universe by Scalable Structure-Guided Discovery**
+> **Deep learning coupled with scalable domain-specific structural validation expands RNA virus discovery from metatranscriptomes**
 > <br>
 > Gaoyang Luo, Zelin Zang, Ling Yuan, Jingbo Zhou, Ao Dong, Yufei Huang, Stan Z. Li, Feng Ju
 > <br>
-> *bioRxiv* 2025.11.24.690314; doi: [10.1101/2025.11.24.690314](https://doi.org/10.1101/2025.11.24.690314)
+> *Nature Communications* (2026). doi: [10.1038/s41467-026-77183-y](https://doi.org/10.1038/s41467-026-77183-y)
 
 **BibTeX:**
 
 ```bibtex
-@article{Luo2025Expanding,
-  title = {Expanding the RNA Virus Universe by Scalable Structure-Guided Discovery},
-  author = {Luo Gaoyang, Zang Zelin, Yuan Ling, Zhou Jingbo, Dong Ao, Huang Yufei, Li Stan Z., Ju Feng},
-  journal = {bioRxiv},
-  year = {2025},
-  doi = {10.1101/2025.11.24.690314},
-  url = {https://www.biorxiv.org/content/10.1101/2025.11.24.690314},
-  publisher = {Cold Spring Harbor Laboratory}
+@article{Luo2026Rider,
+  title = {Deep learning coupled with scalable domain-specific structural validation expands RNA virus discovery from metatranscriptomes},
+  author = {Luo, Gaoyang and Zang, Zelin and Yuan, Ling and Zhou, Jingbo and Dong, Ao and Huang, Yufei and Li, Stan Z. and Ju, Feng},
+  journal = {Nature Communications},
+  year = {2026},
+  doi = {10.1038/s41467-026-77183-y},
+  url = {https://doi.org/10.1038/s41467-026-77183-y}
 }
 ```

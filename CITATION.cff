@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use Rider in your research, please cite this software."
+message: "If you use Rider in your research, please cite the associated paper."
 title: "Rider: an RNA virus identification pipeline"
 type: software
 version: 1.0.0
@@ -20,3 +20,28 @@ keywords:
   - RdRp
   - protein language model
   - bioinformatics
+preferred-citation:
+  type: article
+  title: "Deep learning coupled with scalable domain-specific structural validation expands RNA virus discovery from metatranscriptomes"
+  authors:
+    - family-names: Luo
+      given-names: Gaoyang
+    - family-names: Zang
+      given-names: Zelin
+    - family-names: Yuan
+      given-names: Ling
+    - family-names: Zhou
+      given-names: Jingbo
+    - family-names: Dong
+      given-names: Ao
+    - family-names: Huang
+      given-names: Yufei
+    - family-names: Li
+      given-names: Stan Z.
+    - family-names: Ju
+      given-names: Feng
+  journal: Nature Communications
+  year: 2026
+  month: 9
+  doi: "10.1038/s41467-026-77183-y"
+  url: "https://doi.org/10.1038/s41467-026-77183-y"
